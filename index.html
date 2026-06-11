@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#8fd3ff" />
+  <title>Pip's Sunny Adventure</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>%F0%9F%A6%96</text></svg>" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="stage" aria-label="Pip the Dino game">
+    <canvas id="c" role="img" aria-label="A cute dinosaur platformer"></canvas>
+
+    <!-- Heads-up display -->
+    <div id="hud" class="hidden" aria-hidden="true">
+      <div class="tally"><span class="ico apple"></span><span id="nApple">0</span></div>
+      <div class="tally"><span class="ico egg"></span><span id="nEgg">0</span></div>
+      <div class="tally"><span class="ico star"></span><span id="nStar">0</span></div>
+    </div>
+
+    <button id="muteBtn" class="corner-btn hidden" aria-label="Toggle sound">🔊</button>
+
+    <!-- On-screen touch controls -->
+    <div id="touch" class="hidden" aria-hidden="true">
+      <div class="pad-left">
+        <button class="tbtn move" data-key="left" aria-label="Move left">◀</button>
+        <button class="tbtn move" data-key="right" aria-label="Move right">▶</button>
+      </div>
+      <div class="pad-right">
+        <button class="tbtn roar" data-key="roar" aria-label="Roar">ROAR</button>
+        <button class="tbtn jump" data-key="jump" aria-label="Jump">JUMP</button>
+      </div>
+    </div>
+
+    <!-- Start screen -->
+    <div id="startScreen" class="screen">
+      <div class="card">
+        <h1>Pip's Sunny<br />Adventure</h1>
+        <p class="sub">Help Pip the T-rex collect goodies and reach the flag!</p>
+        <button id="playBtn" class="big-btn">▶ PLAY</button>
+        <div class="legend">
+          <div class="hint"><b>Tap</b> the screen buttons on phone</div>
+          <div class="keys">
+            <span><kbd>←</kbd><kbd>→</kbd> move</span>
+            <span><kbd>Space</kbd> jump</span>
+            <span><kbd>R</kbd> roar</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Win screen -->
+    <div id="winScreen" class="screen hidden">
+      <div class="card">
+        <h1>You did it! 🎉</h1>
+        <p class="sub">Pip reached the flag!</p>
+        <div class="results">
+          <div class="res"><span class="ico apple"></span><span id="wApple">0</span></div>
+          <div class="res"><span class="ico egg"></span><span id="wEgg">0</span></div>
+          <div class="res"><span class="ico star"></span><span id="wStar">0</span></div>
+        </div>
+        <button id="againBtn" class="big-btn">↻ PLAY AGAIN</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="audio.js"></script>
+  <script src="sprites.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
