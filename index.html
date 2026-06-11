@@ -34,6 +34,8 @@
       </div>
     </div>
 
+    <div id="touchHint" class="hidden">Hold ◀ ▶ to move · tap JUMP to hop</div>
+
     <!-- Start screen -->
     <div id="startScreen" class="screen">
       <div class="card">
@@ -41,11 +43,15 @@
         <p class="sub">Help Pip the T-rex collect goodies and reach the flag!</p>
         <button id="playBtn" class="big-btn">▶ PLAY</button>
         <div class="legend">
-          <div class="hint"><b>Tap</b> the screen buttons on phone</div>
-          <div class="keys">
+          <div class="keys key-only">
             <span><kbd>←</kbd><kbd>→</kbd> move</span>
             <span><kbd>Space</kbd> jump</span>
             <span><kbd>R</kbd> roar</span>
+          </div>
+          <div class="keys touch-only">
+            <span><b class="chip">◀&nbsp;▶</b> move</span>
+            <span><b class="chip jump">JUMP</b> hop</span>
+            <span><b class="chip roar">ROAR</b> roar</span>
           </div>
         </div>
       </div>

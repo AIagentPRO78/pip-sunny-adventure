@@ -21,20 +21,24 @@
   var stageEl = document.getElementById("stage");
   var canvas = document.getElementById("c");
   var ctx = canvas.getContext("2d");
-  var cssW = 0, cssH = 0, scale = 1, offX = 0, offY = 0;
+  var cssW = 0, cssH = 0, scale = 1, viewW = STAGE_W;
 
   function resize() {
     cssW = stageEl.clientWidth;
     cssH = stageEl.clientHeight;
-    var dpr = window.devicePixelRatio || 1;
+    // Cap DPR: a 3x backing store murders fill-rate on phones for no visible gain.
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    scale = Math.min(cssW / STAGE_W, cssH / STAGE_H);
-    offX = (cssW - STAGE_W * scale) / 2;
-    offY = (cssH - STAGE_H * scale) / 2;
+    // Fill the screen vertically (fixed world height) and scroll horizontally —
+    // no big letterbox bars, so the game looks full-size in any orientation.
+    scale = cssH / STAGE_H;
+    viewW = cssW / scale;            // world units visible horizontally
   }
   window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", resize);
 
   // ---- game state ----
   var mode = "start";
@@ -149,6 +153,11 @@
   function bindButton(el, key) {
     function down(e) {
       e.preventDefault();
+      // Capture the pointer so a held button keeps firing even if the
+      // finger drifts off the button edge (the usual "it stops moving" bug).
+      if (el.setPointerCapture && e.pointerId != null) {
+        try { el.setPointerCapture(e.pointerId); } catch (err) {}
+      }
       el.classList.add("is-down");
       if (key === "left") input.left = true;
       else if (key === "right") input.right = true;
@@ -156,7 +165,7 @@
       else if (key === "roar") roarQueued = true;
     }
     function up(e) {
-      e.preventDefault();
+      if (e && e.preventDefault) e.preventDefault();
       el.classList.remove("is-down");
       if (key === "left") input.left = false;
       else if (key === "right") input.right = false;
@@ -164,15 +173,16 @@
     el.addEventListener("pointerdown", down);
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", up);
-    el.addEventListener("pointerleave", up);
+    el.addEventListener("lostpointercapture", up);
     el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   }
   var tbtns = document.querySelectorAll(".tbtn");
   for (var bi = 0; bi < tbtns.length; bi++) bindButton(tbtns[bi], tbtns[bi].dataset.key);
 
-  // tap anywhere on the playfield to jump (phones)
+  // tap anywhere on the open playfield to jump (phones); button taps don't
+  // reach here because the buttons are separate elements (target check is a guard)
   canvas.addEventListener("pointerdown", function (e) {
-    if (mode === "play") { jumpQueued = true; }
+    if (mode === "play" && e.target === canvas) jumpQueued = true;
   });
 
   // ---- effects ----
@@ -255,6 +265,14 @@
     var dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     player.vx = dir * MOVE;
     if (dir !== 0) player.face = dir;
+
+    // re-show the "how to move" hint if the player hasn't walked yet (touch)
+    if (dir !== 0) movedYet = true;
+    playClock += dt;
+    if (isTouch && !movedYet && !hintReshown && playClock > 5) {
+      hintReshown = true;
+      showTouchHint();
+    }
 
     // jump
     if (jumpQueued) {
@@ -429,13 +447,20 @@
     if (shakeT > 0) shakeT -= dt;
 
     // camera
-    var target = player.x + player.w / 2 - 360;
+    var target = player.x + player.w / 2 - viewW * 0.34;
+    var maxCam = Math.max(0, WORLD_W - viewW);
     if (target < 0) target = 0;
-    if (target > WORLD_W - STAGE_W) target = WORLD_W - STAGE_W;
+    if (target > maxCam) target = maxCam;
     camX += (target - camX) * Math.min(1, dt * 8);
 
     // reach the flag
     if (player.x + player.w > FLAG_X + 6) winGame();
+  }
+
+  // is world-x within the visible horizontal band (plus padding)?
+  function vis(x, pad) {
+    var p = pad || 120;
+    return x > camX - p && x < camX + viewW + p;
   }
 
   // ---- render ----
@@ -443,67 +468,73 @@
     S.sky(ctx, cssW, cssH);
     ctx.save();
     var sx = (shakeT > 0 && !reduceMotion) ? Math.sin(t * 60) * 6 * shakeT : 0;
-    ctx.translate(offX + sx, offY);
+    ctx.translate(sx, 0);
     ctx.scale(scale, scale);
-    ctx.beginPath();
-    ctx.rect(0, 0, STAGE_W, STAGE_H);
-    ctx.clip();
     if (!world) { ctx.restore(); return; }
+    var i, pad = 140;
 
-    // far parallax: sun + clouds
+    // far parallax: sun + clouds + hills
     ctx.save();
     ctx.translate(-camX * 0.25, 0);
+    var far0 = camX * 0.25;
     S.sun(ctx, 200, 120, 46, t);
-    for (var i = 0; i < world.clouds.length; i++) {
+    for (i = 0; i < world.clouds.length; i++) {
       var cl = world.clouds[i];
-      S.cloud(ctx, cl.x, cl.y, cl.s);
+      if (cl.x > far0 - 90 && cl.x < far0 + viewW + 90) S.cloud(ctx, cl.x, cl.y, cl.s);
     }
-    for (var fx = -200; fx < WORLD_W; fx += 520)
+    for (var fx = Math.floor((far0 - 520) / 520) * 520; fx < far0 + viewW + 520; fx += 520)
       S.hill(ctx, fx, GROUND_Y + 50, 520, 120, "#c7ecaf");
     ctx.restore();
 
     // mid parallax hills
     ctx.save();
     ctx.translate(-camX * 0.5, 0);
-    for (var mx = -200; mx < WORLD_W; mx += 420)
+    var mid0 = camX * 0.5;
+    for (var mx = Math.floor((mid0 - 440) / 420) * 420; mx < mid0 + viewW + 440; mx += 420)
       S.hill(ctx, mx, GROUND_Y + 26, 440, 160, "#a6e38c");
     ctx.restore();
 
-    // world layer
+    // world layer (only what's on screen)
     ctx.save();
     ctx.translate(-camX, 0);
-    for (i = 0; i < world.trees.length; i++) S.tree(ctx, world.trees[i], GROUND_Y, 1);
+    for (i = 0; i < world.trees.length; i++)
+      if (vis(world.trees[i], 70)) S.tree(ctx, world.trees[i], GROUND_Y, 1);
     for (i = 0; i < world.platforms.length; i++) {
       var pl = world.platforms[i];
+      if (pl.x + pl.w < camX - pad || pl.x > camX + viewW + pad) continue;
       if (pl.h > 100) S.ground(ctx, pl.x, pl.y, pl.w, pl.h);
       else S.platform(ctx, pl.x, pl.y, pl.w, pl.h);
     }
     for (i = 0; i < world.blocks.length; i++) {
       var b = world.blocks[i];
+      if (!vis(b.x, pad)) continue;
       var bumpOff = b.bump > 0 ? Math.sin((b.bump / 0.18) * Math.PI) * 9 : 0;
       S.block(ctx, b.x, b.y - bumpOff, 1, b.popped, t);
     }
-    S.flag(ctx, FLAG_X, GROUND_Y, Math.sin(t * 4) * 8);
+    if (vis(FLAG_X, 120)) S.flag(ctx, FLAG_X, GROUND_Y, Math.sin(t * 4) * 8);
     for (i = 0; i < world.collectibles.length; i++) {
       var c = world.collectibles[i];
-      if (c.got) continue;
+      if (c.got || !vis(c.x, pad)) continue;
       if (c.kind === "apple") S.apple(ctx, c.x, c.y, t);
       else if (c.kind === "egg") S.egg(ctx, c.x, c.y, t);
       else S.star(ctx, c.x, c.y, t);
     }
     for (i = 0; i < world.steaks.length; i++) {
       var stk = world.steaks[i];
-      if (!stk.got) S.steak(ctx, stk.x, stk.y, t);
+      if (!stk.got && vis(stk.x, pad)) S.steak(ctx, stk.x, stk.y, t);
     }
-    for (i = 0; i < world.critters.length; i++) S.critter(ctx, world.critters[i], t);
-    for (i = 0; i < world.butterflies.length; i++) S.butterfly(ctx, world.butterflies[i], t);
+    for (i = 0; i < world.critters.length; i++)
+      if (vis(world.critters[i].x, pad)) S.critter(ctx, world.critters[i], t);
+    for (i = 0; i < world.butterflies.length; i++)
+      if (vis(world.butterflies[i].x, pad)) S.butterfly(ctx, world.butterflies[i], t);
     for (i = 0; i < particles.length; i++) S.particle(ctx, particles[i]);
     drawPlayer();
     for (i = 0; i < rings.length; i++) {
       var rg = rings[i];
       S.ring(ctx, rg.x, rg.y, rg.r, Math.max(0, 1 - rg.r / rg.max));
     }
-    for (i = 0; i < world.bushes.length; i++) S.bush(ctx, world.bushes[i], GROUND_Y + 6, 1);
+    for (i = 0; i < world.bushes.length; i++)
+      if (vis(world.bushes[i], pad)) S.bush(ctx, world.bushes[i], GROUND_Y + 6, 1);
     ctx.restore();
 
     ctx.restore();
@@ -529,20 +560,44 @@
 
   function show(id, on) { document.getElementById(id).classList.toggle("hidden", !on); }
 
+  var hintReshown = false, movedYet = false, playClock = 0;
+  function showTouchHint() {
+    var h = document.getElementById("touchHint");
+    if (!h) return;
+    h.classList.remove("hidden");
+    requestAnimationFrame(function () { h.classList.add("show"); });
+    setTimeout(function () { h.classList.remove("show"); }, 3800);
+    setTimeout(function () { h.classList.add("hidden"); }, 4500);
+  }
+
+  // release any held on-screen buttons (prevents stuck movement)
+  function clearHeld() {
+    input.left = false; input.right = false;
+    var held = document.querySelectorAll(".tbtn.is-down");
+    for (var q = 0; q < held.length; q++) held[q].classList.remove("is-down");
+  }
+
   function startGame() {
     A.init();
+    clearHeld();
+    jumpQueued = false; roarQueued = false;
+    movedYet = false; playClock = 0;
     buildLevel();
     mode = "play";
     show("startScreen", false);
     show("winScreen", false);
     show("hud", true);
     show("muteBtn", true);
-    if (isTouch) show("touch", true);
+    if (isTouch) {
+      show("touch", true);
+      showTouchHint();
+    }
   }
 
   function winGame() {
     if (mode === "win") return;
     mode = "win";
+    clearHeld();
     A.win();
     winTimer = 1.6;
     document.getElementById("wApple").textContent = counts.apple;
@@ -561,9 +616,13 @@
     var m = !A.isMuted();
     A.setMuted(m);
     muteBtn.textContent = m ? "🔇" : "🔊";
+    muteBtn.setAttribute("aria-pressed", m ? "true" : "false");
+    muteBtn.setAttribute("aria-label", m ? "Turn sound on" : "Turn sound off");
   });
 
-  var isTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+  var isTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0) ||
+    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  if (isTouch) document.body.classList.add("is-touch");
 
   // ---- loop ----
   var last = 0;

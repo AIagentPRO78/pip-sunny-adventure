@@ -21,12 +21,16 @@
   }
 
   /* ---------- background ---------- */
+  var skyGrad = null, skyGradH = -1;
   function sky(ctx, w, h) {
-    var g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, "#bdeaff");
-    g.addColorStop(0.6, "#dff3ff");
-    g.addColorStop(1, "#fef6d8");
-    ctx.fillStyle = g;
+    if (!skyGrad || skyGradH !== h) {
+      skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+      skyGrad.addColorStop(0, "#bdeaff");
+      skyGrad.addColorStop(0.6, "#dff3ff");
+      skyGrad.addColorStop(1, "#fef6d8");
+      skyGradH = h;
+    }
+    ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, w, h);
   }
 
