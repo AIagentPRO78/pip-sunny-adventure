@@ -88,5 +88,53 @@
     }
   };
 
+  // ---- gentle looping background music (procedural, no files) ----
+  var musicGain = null, musicTimer = null, step = 0, playing = false;
+  var STEP = 0.19; // seconds per step
+  // a soft, bouncy major-key loop; 0 = rest
+  var MELODY = [
+    523, 0, 659, 0, 784, 0, 659, 0, 587, 0, 698, 0, 880, 0, 784, 0,
+    523, 0, 659, 0, 784, 0, 1047, 0, 988, 0, 784, 0, 659, 0, 587, 0
+  ];
+  var BASS = [
+    131, 0, 0, 0, 165, 0, 0, 0, 147, 0, 0, 0, 196, 0, 0, 0,
+    131, 0, 0, 0, 165, 0, 0, 0, 147, 0, 0, 0, 98, 0, 196, 0
+  ];
+
+  function mnote(freq, dur, type, peak) {
+    var t0 = ctx.currentTime;
+    var osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g); g.connect(musicGain);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+  }
+  function mtick() {
+    if (!ctx || muted) { step++; return; }
+    var m = MELODY[step % MELODY.length];
+    if (m) mnote(m, STEP * 1.7, "triangle", 0.16);
+    var b = BASS[step % BASS.length];
+    if (b) mnote(b, STEP * 2.1, "sine", 0.22);
+    step++;
+  }
+
+  SFX.startMusic = function () {
+    if (!ensure() || playing) return;
+    if (!musicGain) {
+      musicGain = ctx.createGain();
+      musicGain.gain.value = 0.8;
+      musicGain.connect(master);
+    }
+    playing = true;
+    mtick();
+    musicTimer = setInterval(mtick, STEP * 1000);
+  };
+  SFX.stopMusic = function () {
+    playing = false;
+    if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+  };
+
   window.DINOAudio = SFX;
 })();

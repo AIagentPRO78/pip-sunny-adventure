@@ -526,10 +526,135 @@
     ctx.globalAlpha = 1;
   }
 
+  /* ---------- power-up foods ---------- */
+  function chili(ctx, x, y, t) {
+    var bob = Math.sin(t * 3 + x) * 3;
+    ctx.save();
+    ctx.translate(x, y + bob);
+    ctx.rotate(0.2);
+    ctx.strokeStyle = "#5aa84a"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(4, -19); ctx.stroke();
+    ctx.fillStyle = "#5aa84a"; circle(ctx, 4, -19, 3); ctx.fill();
+    var g = ctx.createLinearGradient(-8, -12, 8, 18);
+    g.addColorStop(0, "#ff5b4d"); g.addColorStop(1, "#d62f23");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-6, -10);
+    ctx.quadraticCurveTo(11, -10, 8, 6);
+    ctx.quadraticCurveTo(5, 20, -2, 20);
+    ctx.quadraticCurveTo(-10, 10, -6, -10);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.beginPath(); ctx.ellipse(-2, -1, 2, 6, -0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function balloon(ctx, x, y, t) {
+    var sway = Math.sin(t * 2 + x) * 4;
+    ctx.save();
+    ctx.translate(x + sway, y);
+    ctx.strokeStyle = "#b9c2cc"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, 13); ctx.quadraticCurveTo(4, 22, 0, 30); ctx.stroke();
+    var g = ctx.createRadialGradient(-4, -5, 2, 0, 2, 17);
+    g.addColorStop(0, "#9fd4ff"); g.addColorStop(1, "#4cc0f0");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 0, 13, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#4cc0f0";
+    ctx.beginPath(); ctx.moveTo(-3, 14); ctx.lineTo(3, 14); ctx.lineTo(0, 18); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.beginPath(); ctx.ellipse(-5, -6, 3, 5, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function lolly(ctx, x, y, t) {
+    var bob = Math.sin(t * 3 + x) * 3;
+    ctx.save();
+    ctx.translate(x, y + bob);
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(0, 6); ctx.lineTo(0, 22); ctx.stroke();
+    ctx.save();
+    ctx.rotate(t * 2);
+    var cols = ["#ff5d8f", "#ffb14d", "#ffe14d", "#6fe06f", "#5ec8ff", "#c08fff"];
+    for (var i = 0; i < 6; i++) {
+      ctx.fillStyle = cols[i];
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.arc(0, 0, 13, i * Math.PI / 3, (i + 1) * Math.PI / 3);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    ctx.fillStyle = "rgba(255,255,255,0.85)"; circle(ctx, -3, -4, 3); ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    circle(ctx, 0, 0, 13); ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ---------- bounce pad (trampoline) ---------- */
+  function bouncePad(ctx, x, y, w, squish) {
+    var top = 16 * (1 - (squish || 0) * 0.55);
+    ctx.fillStyle = "#7a4bd0";
+    roundRect(ctx, x + 5, y + 8, w - 10, 10, 4); ctx.fill();
+    var g = ctx.createLinearGradient(0, y + (16 - top), 0, y + 16);
+    g.addColorStop(0, "#ff9ec8"); g.addColorStop(1, "#ff5d8f");
+    ctx.fillStyle = g;
+    roundRect(ctx, x, y + (16 - top), w, top + 4, 9); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    roundRect(ctx, x + 8, y + (16 - top) + 3, w - 16, 4, 2); ctx.fill();
+  }
+
+  /* ---------- cage (around the trapped baby) ---------- */
+  function cage(ctx, x, y, w, h, t) {
+    ctx.strokeStyle = "#aab4be"; ctx.lineWidth = 4;
+    for (var bx = x + 7; bx <= x + w - 5; bx += 14) {
+      ctx.beginPath(); ctx.moveTo(bx, y + 3); ctx.lineTo(bx, y + h); ctx.stroke();
+    }
+    ctx.lineWidth = 5; ctx.strokeStyle = "#7e8b98";
+    ctx.beginPath();
+    ctx.moveTo(x, y + 3); ctx.lineTo(x + w, y + 3);
+    ctx.moveTo(x, y + h); ctx.lineTo(x + w, y + h);
+    ctx.stroke();
+    ctx.fillStyle = "#7e8b98";
+    roundRect(ctx, x + w / 2 - 7, y - 6, 14, 10, 3); ctx.fill();
+  }
+
+  /* ---------- baby dino (the one you rescue) ---------- */
+  function babyDino(ctx, p, opts) {
+    var cx = p.x + p.w / 2, feet = p.y + p.h, face = opts.face || 1;
+    var by = feet - p.h, bw = p.w;
+    ctx.save();
+    ctx.translate(cx, feet); ctx.scale(face, 1); ctx.translate(-cx, -feet);
+    // tail
+    ctx.fillStyle = "#8ad77a";
+    ctx.beginPath();
+    ctx.moveTo(cx - bw * 0.18, by + p.h * 0.5);
+    ctx.quadraticCurveTo(cx - bw * 0.7, feet - 6, cx - bw * 0.52, feet - 2);
+    ctx.quadraticCurveTo(cx - bw * 0.2, feet - 2, cx - bw * 0.04, by + p.h * 0.72);
+    ctx.closePath(); ctx.fill();
+    // legs
+    ctx.fillStyle = "#6fc25e";
+    roundRect(ctx, cx - 9, feet - 11, 8, 11, 4); ctx.fill();
+    roundRect(ctx, cx + 2, feet - 11, 8, 11, 4); ctx.fill();
+    // body
+    ctx.fillStyle = "#8ad77a";
+    ctx.beginPath(); ctx.ellipse(cx, by + p.h * 0.55, bw * 0.5, p.h * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#eaf8d0";
+    ctx.beginPath(); ctx.ellipse(cx + 2, by + p.h * 0.62, bw * 0.27, p.h * 0.33, 0, 0, Math.PI * 2); ctx.fill();
+    // head
+    var hr = p.w * 0.43, hx = cx + bw * 0.15, hy = by + p.h * 0.14;
+    ctx.fillStyle = "#8ad77a"; circle(ctx, hx, hy, hr); ctx.fill();
+    ctx.fillStyle = "#7fce6e";
+    roundRect(ctx, hx + hr * 0.15, hy - 2, hr * 0.9, hr * 0.7, hr * 0.3); ctx.fill();
+    // eye
+    ctx.fillStyle = "#fff"; circle(ctx, hx + hr * 0.28, hy - hr * 0.22, hr * 0.34); ctx.fill();
+    ctx.fillStyle = "#2b2440"; circle(ctx, hx + hr * 0.36, hy - hr * 0.22, hr * 0.17); ctx.fill();
+    ctx.restore();
+  }
+
   window.DINOSprites = {
     sky: sky, sun: sun, cloud: cloud, hill: hill, tree: tree, bush: bush,
     ground: ground, platform: platform, apple: apple, egg: egg, star: star,
     steak: steak, block: block, butterfly: butterfly, critter: critter, flag: flag,
-    dino: dino, particle: particle, ring: ring
+    dino: dino, particle: particle, ring: ring,
+    chili: chili, balloon: balloon, lolly: lolly, bouncePad: bouncePad,
+    cage: cage, babyDino: babyDino
   };
 })();

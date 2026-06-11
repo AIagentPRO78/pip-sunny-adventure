@@ -14,6 +14,7 @@
   var GRAV = 2600, MOVE = 320, JUMP_V = -840, DJUMP_V = -760, MAX_FALL = 1500;
   var ROAR_CD = 0.7, ROAR_R = 220, POUND_V = 1300, DEATH_Y = 660;
   var BASE_W = 58, BASE_H = 68, GROW_STEP = 0.25, GROW_MAX = 3;
+  var BOUNCE_V = -1240, DASH_MULT = 1.7, GLIDE_FALL = 130; // power-ups + pads
   var reduceMotion = window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -63,7 +64,7 @@
   var winTimer = 0;
 
   var input = { left: false, right: false };
-  var jumpQueued = false, roarQueued = false;
+  var jumpQueued = false, roarQueued = false, jumpHeld = false;
 
   // ---- level ----
   function plat(x, y, w) { return { x: x, y: y, w: w, h: 26, one: true }; }
@@ -85,7 +86,7 @@
       grnd(4360, 2040),
       plat(700, 360, 150), plat(960, 270, 150), plat(1180, 210, 150),
       plat(1500, 330, 160), plat(1800, 250, 150), plat(2300, 330, 150),
-      plat(2620, 330, 170), plat(3050, 320, 150), plat(3380, 250, 160),
+      plat(3050, 320, 150), plat(3380, 250, 160),
       plat(3700, 330, 150), plat(4180, 330, 170), plat(4600, 300, 150),
       plat(5050, 250, 150), plat(5180, 210, 150), plat(5450, 330, 150)
     ];
@@ -104,11 +105,28 @@
       critterAt(1560, 1470, 1630, 313)
     ];
     var blocks = [
-      { x: 1610, y: 300, popped: false, bump: 0 },
-      { x: 3150, y: 300, popped: false, bump: 0 },
-      { x: 5300, y: 300, popped: false, bump: 0 }
+      { x: 1610, y: 300, popped: false, bump: 0, food: "steak" },
+      { x: 2350, y: 300, popped: false, bump: 0, food: "chili" },
+      { x: 3150, y: 300, popped: false, bump: 0, food: "balloon" },
+      { x: 4250, y: 300, popped: false, bump: 0, food: "lolly" },
+      { x: 5300, y: 300, popped: false, bump: 0, food: "steak" }
     ];
-    var steaks = [];
+    var foods = [];
+    // bounce pads (trampolines): top surface at y
+    var pads = [
+      { x: 1030, y: 444, w: 92, squish: 0 },
+      { x: 3700, y: 314, w: 92, squish: 0 }
+    ];
+    // moving platforms: oscillate on one axis and carry the player
+    var movers = [
+      { x: 2630, y: 330, w: 150, h: 24, x0: 2630, y0: 330, ax: 150, ay: 0, sp: 1.0, ph: 0, dx: 0, dy: 0 },
+      { x: 4900, y: 360, w: 130, h: 24, x0: 4900, y0: 360, ax: 0, ay: 72, sp: 1.1, ph: 1.5, dx: 0, dy: 0 }
+    ];
+    // the baby dino to rescue (starts caged); freed by touch or roar
+    var baby = {
+      x: 3980, y: GROUND_Y - 42, w: 42, h: 42, freed: false,
+      hop: 0, face: 1
+    };
     var butterflies = [];
     var bcols = ["#ff8fbf", "#8fd3ff", "#ffd86b", "#c08fff", "#86e08a"];
     for (var i = 0; i < 9; i++) {
@@ -128,15 +146,17 @@
     for (var bu = 0; bu < 26; bu++) bushes.push(120 + bu * 250 + (bu % 3) * 40);
 
     world = {
-      platforms: platforms, collectibles: collectibles, critters: critters,
-      blocks: blocks, steaks: steaks, butterflies: butterflies, clouds: clouds,
-      trees: trees, bushes: bushes
+      platforms: platforms, movers: movers, pads: pads,
+      collectibles: collectibles, critters: critters,
+      blocks: blocks, foods: foods, baby: baby, babySaved: false,
+      butterflies: butterflies, clouds: clouds, trees: trees, bushes: bushes
     };
     player = {
       x: 120, y: 340, w: BASE_W, h: BASE_H, vx: 0, vy: 0, face: 1,
       grounded: false, airJumps: 1, coyote: 0, run: 0, squash: 0,
       mouth: 0, pounding: false, blink: 0, blinkT: 2.4,
-      safeX: 120, safeY: 340, roarCd: 0, grow: 0
+      safeX: 120, safeY: 340, roarCd: 0, grow: 0,
+      speedT: 0, floatT: 0, sparkleT: 0, ride: null, trail: []
     };
     updateHud();
   }
@@ -147,7 +167,8 @@
     if (k === "arrowleft" || k === "a") { input.left = true; e.preventDefault(); }
     else if (k === "arrowright" || k === "d") { input.right = true; e.preventDefault(); }
     else if (k === " " || k === "arrowup" || k === "w" || k === "spacebar") {
-      jumpQueued = true; e.preventDefault();
+      if (!e.repeat) jumpQueued = true;   // ignore key auto-repeat
+      jumpHeld = true; e.preventDefault();
     } else if (k === "r" || k === "x" || k === "arrowdown" || k === "s") {
       roarQueued = true; e.preventDefault();
     }
@@ -156,6 +177,7 @@
     var k = e.key.toLowerCase();
     if (k === "arrowleft" || k === "a") input.left = false;
     else if (k === "arrowright" || k === "d") input.right = false;
+    else if (k === " " || k === "arrowup" || k === "w" || k === "spacebar") jumpHeld = false;
   }
   window.addEventListener("keydown", keydown);
   window.addEventListener("keyup", keyup);
@@ -171,7 +193,7 @@
       el.classList.add("is-down");
       if (key === "left") input.left = true;
       else if (key === "right") input.right = true;
-      else if (key === "jump") jumpQueued = true;
+      else if (key === "jump") { jumpQueued = true; jumpHeld = true; }
       else if (key === "roar") roarQueued = true;
     }
     function up(e) {
@@ -179,6 +201,7 @@
       el.classList.remove("is-down");
       if (key === "left") input.left = false;
       else if (key === "right") input.right = false;
+      else if (key === "jump") jumpHeld = false;
     }
     el.addEventListener("pointerdown", down);
     el.addEventListener("pointerup", up);
@@ -237,6 +260,11 @@
         burst(cr.x, cr.y - 18, "#ff7aa8", 4, "heart");
       }
     }
+    var bb = world.baby;
+    if (bb && !bb.freed &&
+      Math.hypot(bb.x + bb.w / 2 - cx, bb.y + bb.h / 2 - cy) < ROAR_R + 30) {
+      freeBaby();
+    }
   }
 
   function popBlock(b) {
@@ -245,8 +273,9 @@
     b.bump = 0.18;
     A.collect();
     burst(b.x + 22, b.y, "#e8a43c", 10, "spark");
-    world.steaks.push({
-      x: b.x + 22, y: b.y - 4, vy: -240, restY: b.y - 34, settled: false, got: false
+    world.foods.push({
+      x: b.x + 22, y: b.y - 4, vy: -240, restY: b.y - 34, settled: false, got: false,
+      kind: b.food || "steak"
     });
   }
 
@@ -260,20 +289,64 @@
     player.y = bottom - nh;
   }
 
-  function eatSteak() {
-    A.bounce();
-    if (player.grow < GROW_MAX) { player.grow++; applySize(); }
+  function eatFood(kind) {
+    var cx = player.x + player.w / 2, cy = player.y + player.h / 2;
     player.squash = -0.7;
-    burst(player.x + player.w / 2, player.y + player.h / 2, "#ffd07a", 16, "spark");
-    burst(player.x + player.w / 2, player.y + 6, "#ff7aa8", 6, "heart");
+    if (kind === "chili") {
+      A.doubleJump(); player.speedT = 5;
+      burst(cx, cy, "#ff5b4d", 14, "spark");
+      showToast("Speedy! 🌶️");
+    } else if (kind === "balloon") {
+      A.jump(); player.floatT = 7;
+      burst(cx, cy, "#9fd4ff", 12, "spark");
+      showToast("Floaty! 🎈");
+    } else if (kind === "lolly") {
+      A.collect(); player.sparkleT = 6;
+      burst(cx, cy, "#ff5d8f", 16, "spark");
+      showToast("Sparkly! ✨");
+    } else { // steak
+      A.bounce();
+      if (player.grow < GROW_MAX) { player.grow++; applySize(); }
+      burst(cx, cy, "#ffd07a", 16, "spark");
+      burst(cx, player.y + 6, "#ff7aa8", 6, "heart");
+    }
+  }
+
+  function freeBaby() {
+    var bb = world.baby;
+    if (!bb || bb.freed) return;
+    bb.freed = true;
+    world.babySaved = true;
+    A.bounce();
+    burst(bb.x + bb.w / 2, bb.y + 8, "#ff7aa8", 12, "heart");
+    showToast("You saved the baby! 🦕");
+  }
+
+  var toastT1 = null, toastT2 = null;
+  function showToast(text) {
+    var el = document.getElementById("toast");
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove("hidden");
+    requestAnimationFrame(function () { el.classList.add("show"); });
+    if (toastT1) clearTimeout(toastT1);
+    if (toastT2) clearTimeout(toastT2);
+    toastT1 = setTimeout(function () { el.classList.remove("show"); }, 1600);
+    toastT2 = setTimeout(function () { el.classList.add("hidden"); }, 2100);
+  }
+
+  // one-way landing test (land only when falling onto the top edge)
+  function landsOn(p, prevB, newB) {
+    return player.vy >= 0 && prevB <= p.y + 6 && newB >= p.y &&
+      player.x + player.w > p.x + 4 && player.x < p.x + p.w - 4;
   }
 
   // ---- update ----
   function update(dt) {
     t += dt;
-    // input -> velocity
+    // input -> velocity (chili gives a speed boost)
     var dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    player.vx = dir * MOVE;
+    player.vx = dir * MOVE * (player.speedT > 0 ? DASH_MULT : 1);
     if (dir !== 0) player.face = dir;
 
     // re-show the "how to move" hint if the player hasn't walked yet (touch)
@@ -306,9 +379,21 @@
     }
     jumpQueued = false; roarQueued = false;
 
+    // move the moving platforms first; carry the player if riding one
+    for (var mi = 0; mi < world.movers.length; mi++) {
+      var mv = world.movers[mi];
+      var nx = mv.x0 + mv.ax * Math.sin(t * mv.sp + mv.ph);
+      var ny = mv.y0 + mv.ay * Math.sin(t * mv.sp + mv.ph);
+      mv.dx = nx - mv.x; mv.dy = ny - mv.y;
+      mv.x = nx; mv.y = ny;
+    }
+    if (player.ride) { player.x += player.ride.dx; player.y += player.ride.dy; }
+
     // physics
     player.vy += GRAV * dt;
     if (player.vy > MAX_FALL) player.vy = MAX_FALL;
+    // balloon power-up: hold jump to glide gently down
+    if (player.floatT > 0 && jumpHeld && player.vy > GLIDE_FALL) player.vy = GLIDE_FALL;
     player.x += player.vx * dt;
     if (player.x < 0) player.x = 0;
     if (player.x + player.w > WORLD_W) player.x = WORLD_W - player.w;
@@ -317,15 +402,29 @@
     player.y += player.vy * dt;
     var wasGrounded = player.grounded;
     player.grounded = false;
+    player.ride = null;
     var newBottom = player.y + player.h;
-    for (var i = 0; i < world.platforms.length; i++) {
-      var pl = world.platforms[i];
-      if (player.vy < 0) continue;
-      if (prevBottom <= pl.y + 4 && newBottom >= pl.y &&
-        player.x + player.w > pl.x + 4 && player.x < pl.x + pl.w - 4) {
-        player.y = pl.y - player.h;
-        player.vy = 0;
-        player.grounded = true;
+    var i;
+    for (i = 0; i < world.platforms.length; i++) {
+      if (landsOn(world.platforms[i], prevBottom, newBottom)) {
+        player.y = world.platforms[i].y - player.h; player.vy = 0; player.grounded = true;
+      }
+    }
+    // moving platforms: land and remember which one to ride
+    for (i = 0; i < world.movers.length; i++) {
+      if (landsOn(world.movers[i], prevBottom, newBottom)) {
+        player.y = world.movers[i].y - player.h; player.vy = 0;
+        player.grounded = true; player.ride = world.movers[i];
+      }
+    }
+    // bounce pads: fling Pip up instead of landing
+    for (i = 0; i < world.pads.length; i++) {
+      var pd = world.pads[i];
+      if (landsOn(pd, prevBottom, newBottom)) {
+        player.y = pd.y - player.h; player.vy = BOUNCE_V;
+        player.airJumps = 1; player.grounded = false; player.ride = null;
+        pd.squish = 1; A.bounce();
+        burst(pd.x + pd.w / 2, pd.y, "#ff9ec8", 6, "spark");
       }
     }
 
@@ -361,6 +460,31 @@
     if (player.blinkT <= 0) { player.blink = 0.12; player.blinkT = 2 + Math.random() * 2.5; }
     if (player.blink > 0) player.blink -= dt;
 
+    // power-up timers + their sparkle/flame trails
+    if (player.speedT > 0) {
+      player.speedT -= dt;
+      if (Math.abs(player.vx) > 5 && Math.random() < 0.5)
+        particles.push({
+          x: player.x + player.w / 2, y: player.y + player.h - 8,
+          vx: -player.face * 120, vy: -20 - Math.random() * 40, life: 0.4, max: 0.4,
+          color: "#ff7a4d", type: "spark", r: 3, g: 200, rot: 0
+        });
+    }
+    if (player.floatT > 0) player.floatT -= dt;
+    if (player.sparkleT > 0) {
+      player.sparkleT -= dt;
+      if (Math.random() < 0.6) {
+        var rc = ["#ff5d8f", "#ffb14d", "#ffe14d", "#6fe06f", "#5ec8ff", "#c08fff"][Math.floor(Math.random() * 6)];
+        particles.push({
+          x: player.x + Math.random() * player.w, y: player.y + Math.random() * player.h,
+          vx: (Math.random() - 0.5) * 60, vy: -30 - Math.random() * 40, life: 0.6, max: 0.6,
+          color: rc, type: "spark", r: 2.5, g: 60, rot: 0
+        });
+      }
+    }
+    for (i = 0; i < world.pads.length; i++)
+      if (world.pads[i].squish > 0) world.pads[i].squish = Math.max(0, world.pads[i].squish - dt * 3);
+
     // fall off the world -> gentle respawn
     if (player.y > DEATH_Y) {
       A.whoops();
@@ -379,6 +503,14 @@
     for (i = 0; i < world.collectibles.length; i++) {
       var c = world.collectibles[i];
       if (c.got) continue;
+      // lollipop sparkle magnet: pull nearby goodies toward Pip
+      if (player.sparkleT > 0) {
+        var dmag = Math.hypot(c.x - pcx, c.y - pcy);
+        if (dmag < 170 && dmag > 1) {
+          c.x += (pcx - c.x) * Math.min(1, dt * 6);
+          c.y += (pcy - c.y) * Math.min(1, dt * 6);
+        }
+      }
       if (Math.hypot(c.x - pcx, c.y - pcy) < 34) {
         c.got = true; counts[c.kind]++; A.collect();
         var col = c.kind === "apple" ? "#ff5d5d" : c.kind === "egg" ? "#ffd07a" : "#ffce3a";
@@ -387,10 +519,10 @@
       }
     }
 
-    // steaks: pop out of boxes, settle, then can be eaten to grow bigger
-    for (i = world.steaks.length - 1; i >= 0; i--) {
-      var st = world.steaks[i];
-      if (st.got) { world.steaks.splice(i, 1); continue; }
+    // foods: pop out of boxes, settle, then can be eaten for a power-up
+    for (i = world.foods.length - 1; i >= 0; i--) {
+      var st = world.foods[i];
+      if (st.got) { world.foods.splice(i, 1); continue; }
       if (!st.settled) {
         st.vy += 900 * dt;
         st.y += st.vy * dt;
@@ -398,7 +530,7 @@
       }
       if (Math.hypot(st.x - pcx, st.y - pcy) < 34 + player.grow * 6) {
         st.got = true;
-        eatSteak();
+        eatFood(st.kind);
       }
     }
     for (i = 0; i < world.blocks.length; i++)
@@ -437,6 +569,26 @@
         bf.y = bf.baseY + Math.sin(t * 2 + bf.seed) * 16;
       }
     }
+
+    // baby dino: free by touch (roar frees it too), then trail Pip's path
+    var baby = world.baby;
+    if (baby) {
+      if (!baby.freed) {
+        if (Math.abs(pcx - (baby.x + baby.w / 2)) < 42 &&
+          Math.abs(pcy - (baby.y + baby.h / 2)) < 66) freeBaby();
+      } else {
+        var tp = player.trail.length > 22 ? player.trail[player.trail.length - 22] : null;
+        if (tp) {
+          baby.face = tp.x > baby.x ? 1 : -1;
+          baby.x += (tp.x - baby.x) * Math.min(1, dt * 6);
+          baby.y += (tp.y - baby.y) * Math.min(1, dt * 6);
+        }
+        baby.hop += dt * 9;
+      }
+    }
+    // record Pip's recent path so the baby can follow a few steps behind
+    player.trail.push({ x: player.x + player.w / 2 - 21, y: player.y + player.h - 42 });
+    if (player.trail.length > 44) player.trail.shift();
 
     // particles
     for (i = particles.length - 1; i >= 0; i--) {
@@ -515,6 +667,15 @@
       if (pl.h > 100) S.ground(ctx, pl.x, pl.y, pl.w, pl.h);
       else S.platform(ctx, pl.x, pl.y, pl.w, pl.h);
     }
+    for (i = 0; i < world.movers.length; i++) {
+      var mvp = world.movers[i];
+      if (mvp.x + mvp.w > camX - pad && mvp.x < camX + viewW + pad)
+        S.platform(ctx, mvp.x, mvp.y, mvp.w, mvp.h);
+    }
+    for (i = 0; i < world.pads.length; i++) {
+      var pdp = world.pads[i];
+      if (vis(pdp.x, pad)) S.bouncePad(ctx, pdp.x, pdp.y, pdp.w, pdp.squish);
+    }
     for (i = 0; i < world.blocks.length; i++) {
       var b = world.blocks[i];
       if (!vis(b.x, pad)) continue;
@@ -529,16 +690,28 @@
       else if (c.kind === "egg") S.egg(ctx, c.x, c.y, t);
       else S.star(ctx, c.x, c.y, t);
     }
-    for (i = 0; i < world.steaks.length; i++) {
-      var stk = world.steaks[i];
-      if (!stk.got && vis(stk.x, pad)) S.steak(ctx, stk.x, stk.y, t);
+    for (i = 0; i < world.foods.length; i++) {
+      var fd = world.foods[i];
+      if (fd.got || !vis(fd.x, pad)) continue;
+      if (fd.kind === "chili") S.chili(ctx, fd.x, fd.y, t);
+      else if (fd.kind === "balloon") S.balloon(ctx, fd.x, fd.y, t);
+      else if (fd.kind === "lolly") S.lolly(ctx, fd.x, fd.y, t);
+      else S.steak(ctx, fd.x, fd.y, t);
     }
     for (i = 0; i < world.critters.length; i++)
       if (vis(world.critters[i].x, pad)) S.critter(ctx, world.critters[i], t);
+    // the baby dino (and its cage until freed)
+    var bby = world.baby;
+    if (bby && vis(bby.x, 130)) {
+      if (!bby.freed) S.cage(ctx, bby.x - 6, bby.y - 8, bby.w + 12, bby.h + 10, t);
+      var hopY = bby.freed ? -Math.abs(Math.sin(bby.hop)) * 6 : 0;
+      S.babyDino(ctx, { x: bby.x, y: bby.y + hopY, w: bby.w, h: bby.h }, { face: bby.face });
+    }
     for (i = 0; i < world.butterflies.length; i++)
       if (vis(world.butterflies[i].x, pad)) S.butterfly(ctx, world.butterflies[i], t);
     for (i = 0; i < particles.length; i++) S.particle(ctx, particles[i]);
     drawPlayer();
+    if (player.floatT > 0) S.balloon(ctx, player.x + player.w / 2, player.y - 4, t);
     for (i = 0; i < rings.length; i++) {
       var rg = rings[i];
       S.ring(ctx, rg.x, rg.y, rg.r, Math.max(0, 1 - rg.r / rg.max));
@@ -589,8 +762,9 @@
 
   function startGame() {
     A.init();
+    A.startMusic();
     clearHeld();
-    jumpQueued = false; roarQueued = false;
+    jumpQueued = false; roarQueued = false; jumpHeld = false;
     movedYet = false; playClock = 0;
     buildLevel();
     mode = "play";
@@ -613,6 +787,12 @@
     document.getElementById("wApple").textContent = counts.apple;
     document.getElementById("wEgg").textContent = counts.egg;
     document.getElementById("wStar").textContent = counts.star;
+    var wb = document.getElementById("wBaby");
+    if (wb) {
+      wb.textContent = world.babySaved
+        ? "🦕 You saved the baby dino!"
+        : "🦕 The baby is still caged — find it next time!";
+    }
     show("hud", false);
     show("touch", false);
     show("winScreen", true);
