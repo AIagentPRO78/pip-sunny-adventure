@@ -354,3 +354,80 @@ body.is-touch .touch-only { display: flex; }
 @media (prefers-reduced-motion: reduce) {
   .phone { animation: none; transform: rotate(-90deg); }
 }
+
+/* ---------- level select map ---------- */
+.map-card { width: min(94vw, 540px); }
+.map {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 18px 0 22px;
+  padding: 8px 6px 0;
+}
+.map::before {
+  content: "";
+  position: absolute;
+  top: 42px;
+  left: 14%;
+  right: 14%;
+  border-top: 5px dotted #ffd98a;
+  z-index: 0;
+}
+.node {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--ui-font);
+  padding: 0 2px;
+}
+.node-dot {
+  width: clamp(64px, 18vw, 88px);
+  height: clamp(64px, 18vw, 88px);
+  border-radius: 50%;
+  border: 5px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(26px, 7vw, 38px);
+  box-shadow: 0 6px 0 rgba(43, 36, 64, 0.18);
+  transition: transform 0.12s ease;
+}
+.node-dot.meadow { background: radial-gradient(circle at 35% 30%, #c7ecaf, #6fcf57); }
+.node-dot.beach { background: radial-gradient(circle at 35% 30%, #ffd9a0, #ff9e7d); }
+.node-dot.night { background: radial-gradient(circle at 35% 30%, #3d5a8a, #10183a); }
+.node-name { font-weight: 800; font-size: clamp(12px, 3vw, 15px); color: #6a627d; text-align: center; }
+.node-badge {
+  position: absolute;
+  top: -6px;
+  right: 6%;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 30px;
+  text-align: center;
+  pointer-events: none;
+}
+.node.is-done .node-badge { background: var(--star); box-shadow: 0 3px 0 #d8a300; }
+.node.is-done .node-badge::after { content: "★"; color: #fff; }
+.node.is-locked { cursor: not-allowed; }
+.node.is-locked .node-dot { filter: grayscale(0.85) brightness(0.85); box-shadow: 0 4px 0 rgba(43, 36, 64, 0.12); }
+.node.is-locked .node-badge { background: #cfc8bd; box-shadow: 0 2px 0 rgba(43, 36, 64, 0.12); }
+.node.is-locked .node-badge::after { content: "🔒"; font-size: 14px; }
+.node:not(.is-locked):active .node-dot { transform: translateY(4px) scale(0.96); box-shadow: 0 2px 0 rgba(43, 36, 64, 0.18); }
+.node:not(.is-locked):focus-visible .node-dot { outline: 4px solid var(--jump); outline-offset: 3px; }
+
+.win-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .node-dot { transition: none; }
+}

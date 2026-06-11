@@ -5,6 +5,8 @@
 
   var S = window.DINOSprites;
   var A = window.DINOAudio;
+  var TH = window.DINOThemes;
+  var W = window.DINOWeather;
 
   // ---- constants (stage units) ----
   var STAGE_W = 960, STAGE_H = 540;
@@ -66,98 +68,87 @@
   var input = { left: false, right: false };
   var jumpQueued = false, roarQueued = false, jumpHeld = false;
 
-  // ---- level ----
-  function plat(x, y, w) { return { x: x, y: y, w: w, h: 26, one: true }; }
-  function grnd(x, w) { return { x: x, y: GROUND_Y, w: w, h: 200, one: true }; }
-  function coll(x, y, k) { return { x: x, y: y, kind: k, got: false }; }
-  function critterAt(x, lo, hi, y) {
-    return { x: x, y: y, lo: lo, hi: hi, dir: 1, squish: 0, squishT: 0, baseY: y };
+  // ---- level (data-driven; content lives in levels.js) ----
+  var LEVELS = window.DINOLevels || [];
+  var currentLevel = 0;
+
+  // shallow per-object copy so replaying a level fully resets state and never
+  // mutates the LEVELS templates (every level object is flat).
+  function cloneObjs(arr) {
+    var out = [];
+    for (var i = 0; i < arr.length; i++) {
+      var src = arr[i], cp = {};
+      for (var k in src) if (src.hasOwnProperty(k)) cp[k] = src[k];
+      out.push(cp);
+    }
+    return out;
   }
 
-  function buildLevel() {
-    counts = { apple: 0, egg: 0, star: 0 };
-    particles = [];
-    rings = [];
-    camX = 0;
-    var platforms = [
-      grnd(0, 1180),
-      grnd(1360, 1240),
-      grnd(2800, 1360),
-      grnd(4360, 2040),
-      plat(700, 360, 150), plat(960, 270, 150), plat(1180, 210, 150),
-      plat(1500, 330, 160), plat(1800, 250, 150), plat(2300, 330, 150),
-      plat(3050, 320, 150), plat(3380, 250, 160),
-      plat(3700, 330, 150), plat(4180, 330, 170), plat(4600, 300, 150),
-      plat(5050, 250, 150), plat(5180, 210, 150), plat(5450, 330, 150)
-    ];
-    var collectibles = [
-      coll(360, 415, "apple"), coll(560, 415, "apple"), coll(770, 320, "apple"),
-      coll(1035, 170, "apple"), coll(1500, 290, "apple"), coll(1875, 210, "apple"),
-      coll(2375, 290, "apple"), coll(2700, 290, "apple"), coll(3120, 280, "apple"),
-      coll(3770, 290, "apple"), coll(4660, 260, "apple"), coll(5510, 290, "apple"),
-      coll(940, 415, "egg"), coll(2050, 415, "egg"), coll(3300, 415, "egg"),
-      coll(4980, 415, "egg"), coll(5850, 415, "egg"),
-      coll(1255, 165, "star"), coll(3460, 205, "star"), coll(5255, 165, "star")
-    ];
-    var critters = [
-      critterAt(900, 820, 1120, 443), critterAt(1750, 1500, 2300, 443),
-      critterAt(3050, 2850, 3500, 443), critterAt(4650, 4450, 5000, 443),
-      critterAt(1560, 1470, 1630, 313)
-    ];
-    var blocks = [
-      { x: 1610, y: 300, popped: false, bump: 0, food: "steak" },
-      { x: 2350, y: 300, popped: false, bump: 0, food: "chili" },
-      { x: 3150, y: 300, popped: false, bump: 0, food: "balloon" },
-      { x: 4250, y: 300, popped: false, bump: 0, food: "lolly" },
-      { x: 5300, y: 300, popped: false, bump: 0, food: "steak" }
-    ];
-    var foods = [];
-    // bounce pads (trampolines): top surface at y
-    var pads = [
-      { x: 1030, y: 444, w: 92, squish: 0 },
-      { x: 3700, y: 314, w: 92, squish: 0 }
-    ];
-    // moving platforms: oscillate on one axis and carry the player
-    var movers = [
-      { x: 2630, y: 330, w: 150, h: 24, x0: 2630, y0: 330, ax: 150, ay: 0, sp: 1.0, ph: 0, dx: 0, dy: 0 },
-      { x: 4900, y: 360, w: 130, h: 24, x0: 4900, y0: 360, ax: 0, ay: 72, sp: 1.1, ph: 1.5, dx: 0, dy: 0 }
-    ];
-    // the baby dino to rescue (starts caged); freed by touch or roar
-    var baby = {
-      x: 3980, y: GROUND_Y - 42, w: 42, h: 42, freed: false,
-      hop: 0, face: 1
-    };
-    var butterflies = [];
+  function buildDecor(cfg) {
+    var w = cfg.worldW, d = cfg.decor || {};
     var bcols = ["#ff8fbf", "#8fd3ff", "#ffd86b", "#c08fff", "#86e08a"];
-    for (var i = 0; i < 9; i++) {
-      var bx = 400 + i * 640;
+    var butterflies = [], clouds = [], trees = [], bushes = [], i;
+    var nB = d.butterflies || 0, nC = d.clouds || 0, nT = d.trees || 0, nU = d.bushes || 0;
+    var bGap = nB > 0 ? Math.max(360, Math.floor(w / nB)) : 640;
+    for (i = 0; i < nB; i++) {
+      var bx = 400 + i * bGap;
       butterflies.push({
         x: bx, y: 180 + (i % 3) * 40, baseX: bx, baseY: 180 + (i % 3) * 40,
         seed: i * 1.7, color: bcols[i % bcols.length], vx: 0, vy: 0, scatter: 0
       });
     }
-    var clouds = [];
-    for (var c = 0; c < 14; c++) {
-      clouds.push({ x: 120 + c * 480, y: 60 + (c % 4) * 36, s: 0.7 + (c % 3) * 0.25 });
-    }
-    var trees = [];
-    for (var tr = 0; tr < 22; tr++) trees.push(220 + tr * 300 + (tr % 2) * 60);
-    var bushes = [];
-    for (var bu = 0; bu < 26; bu++) bushes.push(120 + bu * 250 + (bu % 3) * 40);
+    var cGap = nC > 0 ? Math.max(360, Math.floor(w / nC)) : 480;
+    for (i = 0; i < nC; i++)
+      clouds.push({ x: 120 + i * cGap, y: 60 + (i % 4) * 36, s: 0.7 + (i % 3) * 0.25 });
+    var tGap = nT > 0 ? Math.max(220, Math.floor(w / nT)) : 300;
+    for (i = 0; i < nT; i++) trees.push(220 + i * tGap + (i % 2) * 60);
+    var uGap = nU > 0 ? Math.max(180, Math.floor(w / nU)) : 250;
+    for (i = 0; i < nU; i++) bushes.push(120 + i * uGap + (i % 3) * 40);
+    return { butterflies: butterflies, clouds: clouds, trees: trees, bushes: bushes };
+  }
+
+  function buildLevel(idx) {
+    if (idx == null) idx = currentLevel;
+    currentLevel = idx;
+    var cfg = LEVELS[idx];
+
+    counts = { apple: 0, egg: 0, star: 0 };
+    particles = [];
+    rings = [];
+    camX = 0;
+    WORLD_W = cfg.worldW;
+    FLAG_X = cfg.flagX;
+
+    var decor = buildDecor(cfg);
+    var checkpoints = [];
+    for (var ci = 0; ci < (cfg.checkpoints || []).length; ci++)
+      checkpoints.push({ x: cfg.checkpoints[ci].x, raised: false, wave: 0 });
+
+    var bs = cfg.baby;
+    var baby = bs ? { x: bs.x, y: bs.y, w: bs.w, h: bs.h, freed: false, hop: 0, face: 1 } : null;
 
     world = {
-      platforms: platforms, movers: movers, pads: pads,
-      collectibles: collectibles, critters: critters,
-      blocks: blocks, foods: foods, baby: baby, babySaved: false,
-      butterflies: butterflies, clouds: clouds, trees: trees, bushes: bushes
+      theme: cfg.theme || "meadow",
+      platforms: cloneObjs(cfg.platforms),
+      movers: cloneObjs(cfg.movers),
+      pads: cloneObjs(cfg.pads),
+      collectibles: cloneObjs(cfg.collectibles),
+      critters: cloneObjs(cfg.critters),
+      blocks: cloneObjs(cfg.blocks),
+      foods: [],
+      baby: baby, babySaved: false,
+      checkpoints: checkpoints,
+      butterflies: decor.butterflies, clouds: decor.clouds,
+      trees: decor.trees, bushes: decor.bushes
     };
     player = {
-      x: 120, y: 340, w: BASE_W, h: BASE_H, vx: 0, vy: 0, face: 1,
+      x: cfg.startX, y: cfg.startY, w: BASE_W, h: BASE_H, vx: 0, vy: 0, face: 1,
       grounded: false, airJumps: 1, coyote: 0, run: 0, squash: 0,
       mouth: 0, pounding: false, blink: 0, blinkT: 2.4,
-      safeX: 120, safeY: 340, roarCd: 0, grow: 0,
+      safeX: cfg.startX, safeY: cfg.startY, roarCd: 0, grow: 0,
       speedT: 0, floatT: 0, sparkleT: 0, ride: null, trail: []
     };
+    if (W && TH) W.set(TH.get(world.theme).weather, reduceMotion);
     updateHud();
   }
 
@@ -608,6 +599,20 @@
 
     if (shakeT > 0) shakeT -= dt;
 
+    // checkpoints: passing one (while grounded) raises its flag + moves respawn
+    var pmid = player.x + player.w / 2;
+    for (i = 0; i < world.checkpoints.length; i++) {
+      var cp = world.checkpoints[i];
+      if (!cp.raised && player.grounded && pmid > cp.x) {
+        cp.raised = true;
+        A.checkpoint();
+        player.safeX = cp.x - 30; player.safeY = player.y;
+        burst(cp.x, GROUND_Y - 96, "#9be8ff", 8, "spark");
+        showToast("Checkpoint! 🚩");
+      }
+      if (cp.raised && cp.wave < 1) cp.wave = Math.min(1, cp.wave + dt * 3);
+    }
+
     // camera
     var target = player.x + player.w / 2 - viewW * 0.34;
     var maxCam = Math.max(0, WORLD_W - viewW);
@@ -627,25 +632,29 @@
 
   // ---- render ----
   function render() {
-    S.sky(ctx, cssW, cssH);
+    var themeId = world ? world.theme : "meadow";
+    if (TH) TH.drawSky(ctx, cssW, cssH, themeId, t);
+    else S.sky(ctx, cssW, cssH);
     ctx.save();
     var sx = (shakeT > 0 && !reduceMotion) ? Math.sin(t * 60) * 6 * shakeT : 0;
     ctx.translate(sx, 0);
     ctx.scale(scale, scale);
     if (!world) { ctx.restore(); return; }
     var i, pad = 140;
+    var theme = TH ? TH.get(themeId) : null;
+    var hillFar = theme ? theme.hillFar : "#c7ecaf";
+    var hillMid = theme ? theme.hillMid : "#a6e38c";
 
-    // far parallax: sun + clouds + hills
+    // far parallax: clouds + hills (the sky painter already drew the sun/moon)
     ctx.save();
     ctx.translate(-camX * 0.25, 0);
     var far0 = camX * 0.25;
-    S.sun(ctx, 200, 120, 46, t);
     for (i = 0; i < world.clouds.length; i++) {
       var cl = world.clouds[i];
       if (cl.x > far0 - 90 && cl.x < far0 + viewW + 90) S.cloud(ctx, cl.x, cl.y, cl.s);
     }
     for (var fx = Math.floor((far0 - 520) / 520) * 520; fx < far0 + viewW + 520; fx += 520)
-      S.hill(ctx, fx, GROUND_Y + 50, 520, 120, "#c7ecaf");
+      S.hill(ctx, fx, GROUND_Y + 50, 520, 120, hillFar);
     ctx.restore();
 
     // mid parallax hills
@@ -653,7 +662,7 @@
     ctx.translate(-camX * 0.5, 0);
     var mid0 = camX * 0.5;
     for (var mx = Math.floor((mid0 - 440) / 420) * 420; mx < mid0 + viewW + 440; mx += 420)
-      S.hill(ctx, mx, GROUND_Y + 26, 440, 160, "#a6e38c");
+      S.hill(ctx, mx, GROUND_Y + 26, 440, 160, hillMid);
     ctx.restore();
 
     // world layer (only what's on screen)
@@ -681,6 +690,11 @@
       if (!vis(b.x, pad)) continue;
       var bumpOff = b.bump > 0 ? Math.sin((b.bump / 0.18) * Math.PI) * 9 : 0;
       S.block(ctx, b.x, b.y - bumpOff, 1, b.popped, t);
+    }
+    for (i = 0; i < world.checkpoints.length; i++) {
+      var cpf = world.checkpoints[i];
+      if (vis(cpf.x, 90))
+        S.checkFlag(ctx, cpf.x, GROUND_Y, cpf.raised ? cpf.wave : 0, Math.sin(t * 5 + cpf.x) * 1.2);
     }
     if (vis(FLAG_X, 120)) S.flag(ctx, FLAG_X, GROUND_Y, Math.sin(t * 4) * 8);
     for (i = 0; i < world.collectibles.length; i++) {
@@ -721,6 +735,9 @@
     ctx.restore();
 
     ctx.restore();
+
+    // weather overlay in screen space (not affected by camera/zoom)
+    if (W) W.render(ctx, cssW, cssH, t);
   }
 
   function drawPlayer() {
@@ -760,22 +777,64 @@
     for (var q = 0; q < held.length; q++) held[q].classList.remove("is-down");
   }
 
-  function startGame() {
+  // ---- progress (localStorage; degrades gracefully if unavailable) ----
+  var PROGRESS_KEY = "pip_progress";
+  function loadProgress() {
+    try {
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      var p = raw ? JSON.parse(raw) : null;
+      if (!p || !Array.isArray(p.done)) return { done: [] };
+      return p;
+    } catch (e) { return { done: [] }; }
+  }
+  function saveProgress(p) {
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(p)); } catch (e) {}
+  }
+  function isComplete(idx) { return loadProgress().done.indexOf(idx) !== -1; }
+  function markComplete(idx) {
+    var p = loadProgress();
+    if (p.done.indexOf(idx) === -1) { p.done.push(idx); saveProgress(p); }
+  }
+  function isUnlocked(idx) { return idx === 0 || isComplete(idx - 1); }
+
+  // ---- level select ----
+  function refreshLevelNodes() {
+    var nodes = document.querySelectorAll("#levelSelect .node");
+    for (var n = 0; n < nodes.length; n++) {
+      var idx = parseInt(nodes[n].getAttribute("data-level"), 10);
+      var done = isComplete(idx), unlocked = isUnlocked(idx);
+      nodes[n].classList.toggle("is-done", done);
+      nodes[n].classList.toggle("is-locked", !unlocked);
+      nodes[n].disabled = !unlocked;
+    }
+  }
+  function showLevelSelect() {
+    mode = "select";
+    clearHeld();
+    A.stopMusic();
+    show("startScreen", false);
+    show("winScreen", false);
+    show("hud", false);
+    show("touch", false);
+    show("muteBtn", false);
+    refreshLevelNodes();
+    show("levelSelect", true);
+  }
+  function startLevel(idx) {
+    if (!isUnlocked(idx)) return;
     A.init();
     A.startMusic();
     clearHeld();
     jumpQueued = false; roarQueued = false; jumpHeld = false;
     movedYet = false; playClock = 0;
-    buildLevel();
+    buildLevel(idx);
     mode = "play";
+    show("levelSelect", false);
     show("startScreen", false);
     show("winScreen", false);
     show("hud", true);
     show("muteBtn", true);
-    if (isTouch) {
-      show("touch", true);
-      showTouchHint();
-    }
+    if (isTouch) { show("touch", true); showTouchHint(); }
   }
 
   function winGame() {
@@ -784,6 +843,7 @@
     clearHeld();
     A.win();
     winTimer = 1.6;
+    markComplete(currentLevel);
     document.getElementById("wApple").textContent = counts.apple;
     document.getElementById("wEgg").textContent = counts.egg;
     document.getElementById("wStar").textContent = counts.star;
@@ -793,13 +853,39 @@
         ? "🦕 You saved the baby dino!"
         : "🦕 The baby is still caged — find it next time!";
     }
+    var hasNext = currentLevel + 1 < LEVELS.length;
+    var nextBtn = document.getElementById("nextBtn");
+    if (nextBtn) {
+      nextBtn.classList.toggle("hidden", !hasNext);
+      if (hasNext) nextBtn.textContent = "▶ NEXT: " + LEVELS[currentLevel + 1].name.toUpperCase();
+    }
     show("hud", false);
     show("touch", false);
     show("winScreen", true);
   }
 
-  document.getElementById("playBtn").addEventListener("click", startGame);
-  document.getElementById("againBtn").addEventListener("click", startGame);
+  // start card PLAY -> the level map (also unlocks audio on this gesture)
+  document.getElementById("playBtn").addEventListener("click", function () {
+    A.init();
+    showLevelSelect();
+  });
+  var selNodes = document.querySelectorAll("#levelSelect .node");
+  for (var sn = 0; sn < selNodes.length; sn++) {
+    selNodes[sn].addEventListener("click", function () {
+      startLevel(parseInt(this.getAttribute("data-level"), 10));
+    });
+  }
+  document.getElementById("mapBackBtn").addEventListener("click", function () {
+    mode = "start";
+    show("levelSelect", false);
+    show("startScreen", true);
+  });
+  document.getElementById("nextBtn").addEventListener("click", function () {
+    var nxt = currentLevel + 1;
+    if (nxt < LEVELS.length) startLevel(nxt);
+    else showLevelSelect();
+  });
+  document.getElementById("mapBtn").addEventListener("click", showLevelSelect);
 
   var muteBtn = document.getElementById("muteBtn");
   muteBtn.addEventListener("click", function () {
@@ -830,6 +916,7 @@
 
     if (mode === "play") update(dt);
     else t += dt;
+    if (W) W.update(dt, cssW, cssH);   // weather animates on every screen
 
     if (mode === "win" && winTimer > 0) {
       winTimer -= dt;
@@ -860,13 +947,20 @@
     get player() { return player; },
     get world() { return world; },
     get mode() { return mode; },
-    start: startGame,
+    get level() { return currentLevel; },
+    levels: LEVELS,
+    start: showLevelSelect,
+    startLevel: startLevel,
+    showSelect: showLevelSelect,
+    markComplete: markComplete,
+    isComplete: isComplete,
+    resetProgress: function () { saveProgress({ done: [] }); },
     warp: function (x, y) { if (player) { player.x = x; if (y != null) player.y = y; player.vx = 0; player.vy = 0; } }
   };
 
   // ---- boot ----
   resize();
-  buildLevel();      // so the scene shows behind the start card
+  buildLevel(0);     // so the meadow scene shows behind the start card
   mode = "start";
   requestAnimationFrame(frame);
 })();

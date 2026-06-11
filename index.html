@@ -58,6 +58,32 @@
       </div>
     </div>
 
+    <!-- Level select map -->
+    <div id="levelSelect" class="screen hidden">
+      <div class="card map-card">
+        <h1>Pick a Place</h1>
+        <p class="sub">Tap a sunny spot to play!</p>
+        <div class="map" role="list">
+          <button class="node" data-level="0" role="listitem" aria-label="Level 1, Sunny Meadow">
+            <span class="node-dot meadow"><span class="node-emoji">🌳</span></span>
+            <span class="node-name">Sunny Meadow</span>
+            <span class="node-badge" aria-hidden="true"></span>
+          </button>
+          <button class="node" data-level="1" role="listitem" aria-label="Level 2, Sunset Beach">
+            <span class="node-dot beach"><span class="node-emoji">🏖️</span></span>
+            <span class="node-name">Sunset Beach</span>
+            <span class="node-badge" aria-hidden="true"></span>
+          </button>
+          <button class="node" data-level="2" role="listitem" aria-label="Level 3, Starry Night">
+            <span class="node-dot night"><span class="node-emoji">🌙</span></span>
+            <span class="node-name">Starry Night</span>
+            <span class="node-badge" aria-hidden="true"></span>
+          </button>
+        </div>
+        <button id="mapBackBtn" class="small-btn">⌂ Home</button>
+      </div>
+    </div>
+
     <!-- Win screen -->
     <div id="winScreen" class="screen hidden">
       <div class="card">
@@ -69,7 +95,10 @@
           <div class="res"><span class="ico star"></span><span id="wStar">0</span></div>
         </div>
         <p class="baby-line" id="wBaby"></p>
-        <button id="againBtn" class="big-btn">↻ PLAY AGAIN</button>
+        <div class="win-actions">
+          <button id="nextBtn" class="big-btn">▶ NEXT LEVEL</button>
+          <button id="mapBtn" class="small-btn">🗺️ Map</button>
+        </div>
       </div>
     </div>
 
@@ -86,6 +115,9 @@
 
   <script src="audio.js"></script>
   <script src="sprites.js"></script>
+  <script src="themes.js"></script>
+  <script src="weather.js"></script>
+  <script src="levels.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

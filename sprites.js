@@ -649,12 +649,31 @@
     ctx.restore();
   }
 
+  /* ---------- checkpoint flag (smaller; raises when reached) ---------- */
+  function checkFlag(ctx, x, groundY, raised, wave) {
+    var poleH = 96, poleTop = groundY - poleH;
+    ctx.fillStyle = "#cdd6df";
+    roundRect(ctx, x - 3, poleTop, 6, poleH, 3); ctx.fill();
+    circle(ctx, x, poleTop, 5); ctx.fillStyle = "#9be8ff"; ctx.fill();
+    var rise = Math.max(0, Math.min(1, raised));
+    var fy = poleTop + (1 - rise) * (poleH - 30) + 4;
+    var w = wave || 0;
+    ctx.fillStyle = rise > 0.5 ? "#ff5d8f" : "#9bb7a0";
+    ctx.beginPath();
+    ctx.moveTo(x + 3, fy);
+    ctx.quadraticCurveTo(x + 26 + w * 6, fy + 6, x + 44, fy);
+    ctx.lineTo(x + 44, fy + 26);
+    ctx.quadraticCurveTo(x + 26 - w * 6, fy + 20, x + 3, fy + 26);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   window.DINOSprites = {
     sky: sky, sun: sun, cloud: cloud, hill: hill, tree: tree, bush: bush,
     ground: ground, platform: platform, apple: apple, egg: egg, star: star,
     steak: steak, block: block, butterfly: butterfly, critter: critter, flag: flag,
     dino: dino, particle: particle, ring: ring,
     chili: chili, balloon: balloon, lolly: lolly, bouncePad: bouncePad,
-    cage: cage, babyDino: babyDino
+    cage: cage, babyDino: babyDino, checkFlag: checkFlag
   };
 })();

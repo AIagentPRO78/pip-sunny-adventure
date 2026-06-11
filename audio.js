@@ -85,6 +85,13 @@
       for (var i = 0; i < notes.length; i++) {
         tone(notes[i], notes[i], t + i * 0.13, 0.22, "triangle", 0.26);
       }
+    },
+    checkpoint: function () {
+      if (muted || !ensure()) return;
+      var t = ctx.currentTime;
+      tone(660, 660, t, 0.1, "triangle", 0.24);
+      tone(990, 990, t + 0.08, 0.14, "triangle", 0.22);
+      tone(1320, 1320, t + 0.18, 0.16, "sine", 0.18);
     }
   };
 
