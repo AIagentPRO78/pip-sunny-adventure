@@ -35,6 +35,16 @@
     // no big letterbox bars, so the game looks full-size in any orientation.
     scale = cssH / STAGE_H;
     viewW = cssW / scale;            // world units visible horizontally
+    updateRotateNudge();
+  }
+
+  // Encourage landscape on phones: show a nudge in portrait, hide on rotate.
+  var rotateDismissed = false;
+  function updateRotateNudge() {
+    var el = document.getElementById("rotateNudge");
+    if (!el) return;
+    var show = isTouch && !rotateDismissed && cssH > cssW;
+    el.classList.toggle("hidden", !show);
   }
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
@@ -620,8 +630,14 @@
     muteBtn.setAttribute("aria-label", m ? "Turn sound on" : "Turn sound off");
   });
 
+  document.getElementById("rotateDismiss").addEventListener("click", function () {
+    rotateDismissed = true;
+    updateRotateNudge();
+  });
+
   var isTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0) ||
-    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+    /[?&]touch=1/.test(location.search);   // ?touch=1 forces touch controls
   if (isTouch) document.body.classList.add("is-touch");
 
   // ---- loop ----
