@@ -60,6 +60,41 @@
   window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
   if (window.visualViewport) window.visualViewport.addEventListener("resize", resize);
 
+  // Keep phones in landscape for easier play. screen.orientation.lock only
+  // works in fullscreen or an installed PWA, so in a normal browser tab we
+  // first request fullscreen (must be on a tap) and then lock. All of it is
+  // best-effort: desktop is skipped, and iOS Safari has no lock API so the
+  // rotate nudge stays as its fallback there.
+  function lockLandscape() {
+    try {
+      var o = screen.orientation;
+      if (o && o.lock) {
+        var p = o.lock("landscape");
+        if (p && p.catch) p.catch(function () {});
+      }
+    } catch (e) {}
+  }
+  function goLandscape() {
+    if (!isTouch) return;
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      lockLandscape();
+      return;
+    }
+    try {
+      var el = document.documentElement;
+      var req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (req) {
+        var r = req.call(el);
+        if (r && r.then) r.then(lockLandscape).catch(lockLandscape);
+        else lockLandscape();
+      } else {
+        lockLandscape();
+      }
+    } catch (e) {
+      lockLandscape();
+    }
+  }
+
   // ---- game state ----
   var mode = "start";
   var t = 0;
@@ -1189,6 +1224,7 @@
   function startLevel(idx) {
     if (!isUnlocked(idx)) return;
     A.init();
+    goLandscape();   // fullscreen + lock to landscape on phones (best-effort)
     clearHeld();
     jumpQueued = false; roarQueued = false; jumpHeld = false;
     movedYet = false; playClock = 0;

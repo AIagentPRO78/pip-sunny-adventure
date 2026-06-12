@@ -209,8 +209,8 @@ body.is-touch .touch-only { display: flex; }
 .pad-right { display: flex; gap: clamp(14px, 4vw, 26px); align-items: flex-end; pointer-events: none; }
 .tbtn {
   pointer-events: auto;
-  width: clamp(58px, 16vw, 92px);
-  height: clamp(58px, 16vw, 92px);
+  width: clamp(62px, 17vw, 100px);
+  height: clamp(62px, 17vw, 100px);
   border-radius: 50%;
   border: 4px solid rgba(255, 255, 255, 0.95);
   color: #fff;
@@ -235,8 +235,8 @@ body.is-touch .touch-only { display: flex; }
 .tbtn.jump {
   background: var(--jump);
   box-shadow: 0 6px 0 #2f93bd;
-  width: clamp(66px, 18.5vw, 108px);
-  height: clamp(66px, 18.5vw, 108px);
+  width: clamp(70px, 19.5vw, 116px);
+  height: clamp(70px, 19.5vw, 116px);
   animation: jumpPulse 1.5s ease-in-out infinite;
 }
 .tbtn.roar { background: var(--roar); box-shadow: 0 5px 0 #d23a6e; }
@@ -289,8 +289,8 @@ body.is-touch .touch-only { display: flex; }
 
 /* short landscape: shrink controls so they don't swallow the screen */
 @media (orientation: landscape) and (max-height: 470px) {
-  .tbtn { width: clamp(56px, 14vh, 76px); height: clamp(56px, 14vh, 76px); }
-  .tbtn.jump { width: clamp(64px, 17vh, 90px); height: clamp(64px, 17vh, 90px); }
+  .tbtn { width: clamp(60px, 15vh, 84px); height: clamp(60px, 15vh, 84px); }
+  .tbtn.jump { width: clamp(68px, 18vh, 98px); height: clamp(68px, 18vh, 98px); }
   #touchHint { bottom: max(96px, calc(env(safe-area-inset-bottom) + 96px)); }
 }
 

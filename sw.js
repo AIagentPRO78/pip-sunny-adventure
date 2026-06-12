@@ -4,7 +4,7 @@
    cached assets (and the cached index.html shell) when offline. */
 "use strict";
 
-var CACHE = "pip-v4-net";
+var CACHE = "pip-v5-net";
 
 var CORE = [
   "./",
