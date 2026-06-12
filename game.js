@@ -1446,6 +1446,15 @@
     /[?&]touch=1/.test(location.search);   // ?touch=1 forces touch controls
   if (isTouch) document.body.classList.add("is-touch");
 
+  // On touch devices that can't do a real orientation lock (iOS Safari has no
+  // screen.orientation.lock and no element fullscreen), fall back to a CSS
+  // rotation so the game still plays in landscape. ?rot=1 forces it for testing.
+  var canRealLock = !!(window.screen && screen.orientation && screen.orientation.lock) &&
+    !!document.documentElement.requestFullscreen;
+  if ((isTouch && !canRealLock) || /[?&]rot=1/.test(location.search)) {
+    document.body.classList.add("force-landscape");
+  }
+
   // ---- loop ----
   var last = 0;
   function frame(now) {
