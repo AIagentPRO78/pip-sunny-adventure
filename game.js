@@ -94,6 +94,16 @@
       lockLandscape();
     }
   }
+  // Give kids a clear way out of fullscreen: drop it whenever we return to the
+  // map/menu, so they're never trapped without knowing the OS gesture.
+  function exitFullscreen() {
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        var ex = document.exitFullscreen || document.webkitExitFullscreen;
+        if (ex) { var r = ex.call(document); if (r && r.catch) r.catch(function () {}); }
+      }
+    } catch (e) {}
+  }
 
   // ---- game state ----
   var mode = "start";
@@ -155,6 +165,7 @@
     if (idx == null) idx = currentLevel;
     currentLevel = idx;
     var cfg = LEVELS[idx];
+    if (!cfg) return;   // no level data (levels.js absent) — leave world null; render() tolerates it
 
     counts = { apple: 0, egg: 0, star: 0 };
     coinCount = 0;
@@ -940,6 +951,22 @@
 
   function show(id, on) { document.getElementById(id).classList.toggle("hidden", !on); }
 
+  // Keyboard focus management for dialogs: move focus into a dialog when it
+  // opens and return it to the trigger when it closes (best-effort, no-throw).
+  var lastFocus = null;
+  function focusInto(id) {
+    try {
+      lastFocus = document.activeElement;
+      var el = document.getElementById(id);
+      var f = el && el.querySelector("button, [href], input, select, [tabindex]");
+      if (f) f.focus();
+    } catch (e) {}
+  }
+  function restoreFocus() {
+    try { if (lastFocus && lastFocus.focus) lastFocus.focus(); } catch (e) {}
+    lastFocus = null;
+  }
+
   var hintReshown = false, movedYet = false, playClock = 0;
   function showTouchHint() {
     var h = document.getElementById("touchHint");
@@ -953,6 +980,7 @@
   // release any held on-screen buttons (prevents stuck movement)
   function clearHeld() {
     input.left = false; input.right = false;
+    jumpHeld = false;   // also purge glide state so pause/resume can't auto-glide
     var held = document.querySelectorAll(".tbtn.is-down");
     for (var q = 0; q < held.length; q++) held[q].classList.remove("is-down");
   }
@@ -1019,11 +1047,12 @@
     var lv = document.getElementById("optLearnValue");
     if (lv) lv.textContent = LEARN_LABELS[settings.learn] || "Off";
   }
-  function openSettings(from) { settingsReturn = from || "start"; settingsOpen = true; syncToggleUI(); show("settings", true); }
+  function openSettings(from) { settingsReturn = from || "start"; settingsOpen = true; syncToggleUI(); show("settings", true); focusInto("settings"); }
   function closeSettings() {
     settingsOpen = false;
     show("settings", false);
-    if (settingsReturn === "pause") show("pauseOverlay", true);
+    if (settingsReturn === "pause") { show("pauseOverlay", true); focusInto("pauseOverlay"); }
+    else restoreFocus();
   }
   function toggleSetting(key) {
     settings[key] = !settings[key];
@@ -1092,8 +1121,8 @@
     if (mode !== "play" || tutorialOpen) return;
     if (on === paused) return;
     paused = on;
-    if (paused) { clearHeld(); camZoom = 0; show("pauseOverlay", true); }
-    else { show("pauseOverlay", false); last = 0; }
+    if (paused) { clearHeld(); camZoom = 0; show("pauseOverlay", true); focusInto("pauseOverlay"); }
+    else { show("pauseOverlay", false); restoreFocus(); last = 0; }
   }
   function togglePause() { setPaused(!paused); }
 
@@ -1101,7 +1130,7 @@
   var TUTORIAL_KEY = "pip_seen_tutorial";
   function seenTutorial() { try { return localStorage.getItem(TUTORIAL_KEY) === "1"; } catch (e) { return false; } }
   function maybeShowTutorial() {
-    if (!seenTutorial()) { tutorialOpen = true; paused = true; show("tutorial", true); }
+    if (!seenTutorial()) { tutorialOpen = true; paused = true; show("tutorial", true); focusInto("tutorial"); }
     else if (isTouch) showTouchHint();
   }
   function dismissTutorial() {
@@ -1202,6 +1231,7 @@
     mode = "select";
     paused = false;
     clearHeld();
+    exitFullscreen();   // leaving gameplay -> drop fullscreen so kids aren't trapped
     A.stopMusic();
     show("startScreen", false);
     show("winScreen", false);
@@ -1223,11 +1253,12 @@
   }
   function startLevel(idx) {
     if (!isUnlocked(idx)) return;
+    if (!LEVELS[idx]) return;   // levels.js missing/failed to load — nothing to start
     A.init();
     goLandscape();   // fullscreen + lock to landscape on phones (best-effort)
     clearHeld();
     jumpQueued = false; roarQueued = false; jumpHeld = false;
-    movedYet = false; playClock = 0;
+    movedYet = false; playClock = 0; hintReshown = false;
     paused = false;
     fadeFlash();
     buildLevel(idx);
@@ -1370,8 +1401,8 @@
     var ac = document.getElementById("albumCount");
     if (ac) ac.textContent = got + " of " + list.length + " stickers";
   }
-  function showAchievements() { if (!window.DINOAchievements) return; renderBadges(); show("levelSelect", false); show("achievements", true); }
-  function showAlbum() { if (!window.DINOStickers) return; refreshAlbum(); show("levelSelect", false); show("album", true); }
+  function showAchievements() { if (!window.DINOAchievements) return; renderBadges(); show("levelSelect", false); show("achievements", true); focusInto("achievements"); }
+  function showAlbum() { if (!window.DINOStickers) return; refreshAlbum(); show("levelSelect", false); show("album", true); focusInto("album"); }
   document.getElementById("achBtnOpen").addEventListener("click", showAchievements);
   document.getElementById("albumBtnOpen").addEventListener("click", showAlbum);
   document.getElementById("achBackBtn").addEventListener("click", function () { show("achievements", false); showLevelSelect(); });
@@ -1477,7 +1508,7 @@
   settings = loadSettings();
   applySettings();   // mute state + reduceMotion applied before first frame
   resize();
-  buildLevel(0);     // so the meadow scene shows behind the start card
+  if (LEVELS.length > 0) buildLevel(0);   // meadow scene behind the start card (guarded if levels.js missing)
   mode = "start";
   requestAnimationFrame(frame);
 })();

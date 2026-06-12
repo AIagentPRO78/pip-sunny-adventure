@@ -4,7 +4,7 @@
    cached assets (and the cached index.html shell) when offline. */
 "use strict";
 
-var CACHE = "pip-v5-net";
+var CACHE = "pip-v6-net";
 
 var CORE = [
   "./",
@@ -26,6 +26,7 @@ var CORE = [
   "manifest.webmanifest",
   "icon-192.png",
   "icon-512.png",
+  "icon-512-maskable.png",
   "apple-touch-icon.png"
 ];
 

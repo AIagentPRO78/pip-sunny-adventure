@@ -18,7 +18,7 @@
     <canvas id="c" role="img" aria-label="A cute dinosaur platformer"></canvas>
 
     <!-- Heads-up display -->
-    <div id="hud" class="hidden" aria-hidden="true">
+    <div id="hud" class="hidden">
       <div class="tally"><span class="ico apple"></span><span id="nApple">0</span></div>
       <div class="tally"><span class="ico egg"></span><span id="nEgg">0</span></div>
       <div class="tally"><span class="ico star"></span><span id="nStar">0</span></div>
@@ -26,10 +26,10 @@
     </div>
 
     <button id="pauseBtn" class="corner-btn hidden" aria-label="Pause game">⏸</button>
-    <button id="muteBtn" class="corner-btn hidden" aria-label="Toggle sound">🔊</button>
+    <button id="muteBtn" class="corner-btn hidden" aria-label="Turn sound off" aria-pressed="false">🔊</button>
 
     <!-- On-screen touch controls -->
-    <div id="touch" class="hidden" aria-hidden="true">
+    <div id="touch" class="hidden">
       <div class="pad-left">
         <button class="tbtn move" data-key="left" aria-label="Move left">◀</button>
         <button class="tbtn move" data-key="right" aria-label="Move right">▶</button>
@@ -180,9 +180,9 @@
             <span class="toggle-label">🤝 Helper Mode</span>
             <span class="toggle-pill" aria-hidden="true"><span class="toggle-knob"></span></span>
           </button>
-          <button class="toggle-row select-row" id="optLearn" aria-label="Learning labels">
+          <button class="toggle-row select-row" id="optLearn">
             <span class="toggle-label">🎓 Learn</span>
-            <span class="select-value" id="optLearnValue">Off</span>
+            <span class="select-value" id="optLearnValue" aria-live="polite">Off</span>
           </button>
         </div>
         <div class="actions"><button id="settingsBackBtn" class="small-btn">‹ Back</button></div>
@@ -206,7 +206,7 @@
     </div>
 
     <!-- Rotate-to-landscape nudge (touch + portrait only) -->
-    <div id="rotateNudge" class="hidden" role="dialog" aria-label="Turn your phone sideways">
+    <div id="rotateNudge" class="hidden" role="dialog" aria-modal="true" aria-label="Turn your phone sideways">
       <div class="rotate-card">
         <div class="phone-rot" aria-hidden="true"><span class="phone"></span></div>
         <h2>Turn your phone sideways</h2>
