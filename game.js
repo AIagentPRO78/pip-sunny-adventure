@@ -17,7 +17,8 @@
   var ROAR_CD = 0.7, ROAR_R = 220, POUND_V = 1300, DEATH_Y = 660;
   var BASE_W = 58, BASE_H = 68, GROW_STEP = 0.25, GROW_MAX = 3;
   var BOUNCE_V = -1240, DASH_MULT = 1.7, GLIDE_FALL = 130; // power-ups + pads
-  var reduceMotion = window.matchMedia &&
+  var reduceMotion = false;   // real value set by applySettings() at boot
+  var osReduceMotion = window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ---- canvas ----
@@ -67,6 +68,8 @@
 
   var input = { left: false, right: false };
   var jumpQueued = false, roarQueued = false, jumpHeld = false;
+  var paused = false, settingsOpen = false, tutorialOpen = false, settingsReturn = "start";
+  var stepTimer = 0;
 
   // ---- level (data-driven; content lives in levels.js) ----
   var LEVELS = window.DINOLevels || [];
@@ -139,7 +142,8 @@
       baby: baby, babySaved: false,
       checkpoints: checkpoints,
       butterflies: decor.butterflies, clouds: decor.clouds,
-      trees: decor.trees, bushes: decor.bushes
+      trees: decor.trees, bushes: decor.bushes,
+      decorProps: (window.DINODecor ? window.DINODecor.place(cfg.theme || "meadow", cfg.worldW) : [])
     };
     player = {
       x: cfg.startX, y: cfg.startY, w: BASE_W, h: BASE_H, vx: 0, vy: 0, face: 1,
@@ -155,6 +159,14 @@
   // ---- input ----
   function keydown(e) {
     var k = e.key.toLowerCase();
+    if (k === "escape") {
+      if (tutorialOpen) { dismissTutorial(); e.preventDefault(); return; }
+      if (settingsOpen) { closeSettings(); e.preventDefault(); return; }
+      if (mode === "play") { togglePause(); e.preventDefault(); }
+      return;
+    }
+    if (k === "p") { if (mode === "play") { togglePause(); e.preventDefault(); } return; }
+    if (paused || settingsOpen || tutorialOpen) return;   // swallow gameplay keys while overlaid
     if (k === "arrowleft" || k === "a") { input.left = true; e.preventDefault(); }
     else if (k === "arrowright" || k === "d") { input.right = true; e.preventDefault(); }
     else if (k === " " || k === "arrowup" || k === "w" || k === "spacebar") {
@@ -283,20 +295,20 @@
   function eatFood(kind) {
     var cx = player.x + player.w / 2, cy = player.y + player.h / 2;
     player.squash = -0.7;
+    A.eat(kind);
     if (kind === "chili") {
-      A.doubleJump(); player.speedT = 5;
+      player.speedT = 5;
       burst(cx, cy, "#ff5b4d", 14, "spark");
       showToast("Speedy! 🌶️");
     } else if (kind === "balloon") {
-      A.jump(); player.floatT = 7;
+      player.floatT = 7;
       burst(cx, cy, "#9fd4ff", 12, "spark");
       showToast("Floaty! 🎈");
     } else if (kind === "lolly") {
-      A.collect(); player.sparkleT = 6;
+      player.sparkleT = 6;
       burst(cx, cy, "#ff5d8f", 16, "spark");
       showToast("Sparkly! ✨");
     } else { // steak
-      A.bounce();
       if (player.grow < GROW_MAX) { player.grow++; applySize(); }
       burst(cx, cy, "#ffd07a", 16, "spark");
       burst(cx, player.y + 6, "#ff7aa8", 6, "heart");
@@ -444,6 +456,10 @@
 
     // animation timers
     if (Math.abs(player.vx) > 5 && player.grounded) player.run += dt * 12;
+    if (player.grounded && Math.abs(player.vx) > 5) {
+      stepTimer -= dt;
+      if (stepTimer <= 0) { A.step(); stepTimer = 0.28; }
+    } else { stepTimer = 0; }
     player.squash *= Math.pow(0.0001, dt); // fast decay toward 0
     if (player.mouth > 0) player.mouth = Math.max(0, player.mouth - dt);
     if (player.roarCd > 0) player.roarCd -= dt;
@@ -649,9 +665,14 @@
     ctx.save();
     ctx.translate(-camX * 0.25, 0);
     var far0 = camX * 0.25;
+    var cloudA = themeId === "night" ? 0.4 : 1;
     for (i = 0; i < world.clouds.length; i++) {
       var cl = world.clouds[i];
-      if (cl.x > far0 - 90 && cl.x < far0 + viewW + 90) S.cloud(ctx, cl.x, cl.y, cl.s);
+      if (cl.x > far0 - 90 && cl.x < far0 + viewW + 90) {
+        if (cloudA < 1) ctx.globalAlpha = cloudA;
+        S.cloud(ctx, cl.x, cl.y, cl.s);
+        if (cloudA < 1) ctx.globalAlpha = 1;
+      }
     }
     for (var fx = Math.floor((far0 - 520) / 520) * 520; fx < far0 + viewW + 520; fx += 520)
       S.hill(ctx, fx, GROUND_Y + 50, 520, 120, hillFar);
@@ -670,6 +691,10 @@
     ctx.translate(-camX, 0);
     for (i = 0; i < world.trees.length; i++)
       if (vis(world.trees[i], 70)) S.tree(ctx, world.trees[i], GROUND_Y, 1);
+    if (window.DINODecor && world.decorProps)
+      for (i = 0; i < world.decorProps.length; i++)
+        if (vis(world.decorProps[i].x, 90))
+          window.DINODecor.draw(ctx, world.decorProps[i].kind, world.decorProps[i].x, GROUND_Y, t);
     for (i = 0; i < world.platforms.length; i++) {
       var pl = world.platforms[i];
       if (pl.x + pl.w < camX - pad || pl.x > camX + viewW + pad) continue;
@@ -749,6 +774,7 @@
       moving: Math.abs(player.vx) > 5 && player.grounded,
       blink: player.blink > 0
     });
+    if (window.DINOCosmetics) window.DINOCosmetics.drawOn(ctx, player, { face: player.face });
   }
 
   // ---- HUD / screens ----
@@ -797,6 +823,158 @@
   }
   function isUnlocked(idx) { return idx === 0 || isComplete(idx - 1); }
 
+  // ---- settings (localStorage; graceful degrade) ----
+  var SETTINGS_KEY = "pip_settings";
+  var settings = { music: true, sound: true, reduceMotion: false };
+  function loadSettings() {
+    try {
+      var raw = localStorage.getItem(SETTINGS_KEY);
+      var s = raw ? JSON.parse(raw) : null;
+      if (!s || typeof s !== "object") return { music: true, sound: true, reduceMotion: false };
+      return { music: s.music !== false, sound: s.sound !== false, reduceMotion: s.reduceMotion === true };
+    } catch (e) { return { music: true, sound: true, reduceMotion: false }; }
+  }
+  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
+  function applySettings() {
+    if (A.setMusicMuted) A.setMusicMuted(!settings.music);
+    if (A.setSfxMuted) A.setSfxMuted(!settings.sound);
+    reduceMotion = osReduceMotion || settings.reduceMotion;
+    document.body.classList.toggle("reduce-motion", reduceMotion);
+  }
+  function setSwitch(id, on) { var el = document.getElementById(id); if (el) el.setAttribute("aria-checked", on ? "true" : "false"); }
+  function syncToggleUI() {
+    setSwitch("optMusic", settings.music);
+    setSwitch("optSound", settings.sound);
+    setSwitch("optMotion", settings.reduceMotion);
+  }
+  function openSettings(from) { settingsReturn = from || "start"; settingsOpen = true; syncToggleUI(); show("settings", true); }
+  function closeSettings() {
+    settingsOpen = false;
+    show("settings", false);
+    if (settingsReturn === "pause") show("pauseOverlay", true);
+  }
+  function toggleSetting(key) {
+    settings[key] = !settings[key];
+    saveSettings();
+    applySettings();
+    syncToggleUI();
+    if (key === "reduceMotion" && W && TH && world) W.set(TH.get(world.theme).weather, reduceMotion);
+  }
+
+  // ---- stars (best-per-level) ----
+  var STARS_KEY = "pip_stars";
+  function loadStars() {
+    try { var s = JSON.parse(localStorage.getItem(STARS_KEY)); return (s && typeof s === "object") ? s : {}; }
+    catch (e) { return {}; }
+  }
+  function saveStars(o) { try { localStorage.setItem(STARS_KEY, JSON.stringify(o)); } catch (e) {} }
+  function bestStars(idx) { var v = loadStars()[idx]; return (typeof v === "number" && v >= 0) ? v : 0; }
+  function recordStars(idx, n) { var s = loadStars(); if (!(s[idx] >= n)) { s[idx] = n; saveStars(s); } return s[idx]; }
+  function totalStars() {
+    var s = loadStars(), sum = 0;
+    for (var k in s) if (s.hasOwnProperty(k) && typeof s[k] === "number") sum += s[k];
+    return sum;
+  }
+  function computeStars() {
+    var cfg = LEVELS[currentLevel];
+    var total = (cfg && cfg.collectibles) ? cfg.collectibles.length : 0;
+    var got = counts.apple + counts.egg + counts.star;
+    var frac = total > 0 ? got / total : 1;   // no collectibles -> reaching the flag is a clear
+    var saved = world && world.babySaved;
+    if (frac >= 1) return 3;
+    if (frac >= 0.75 && saved) return 3;
+    if (frac >= 0.75) return 2;
+    if (frac >= 0.45) return 1;
+    return 0;
+  }
+  function starHTML(n) {
+    n = Math.max(0, Math.min(3, n | 0));
+    return new Array(n + 1).join("★") + "<span class=\"dim\">" + new Array(3 - n + 1).join("☆") + "</span>";
+  }
+
+  // ---- pause ----
+  function setPaused(on) {
+    if (mode !== "play" || tutorialOpen) return;
+    if (on === paused) return;
+    paused = on;
+    if (paused) { clearHeld(); show("pauseOverlay", true); }
+    else { show("pauseOverlay", false); last = 0; }
+  }
+  function togglePause() { setPaused(!paused); }
+
+  // ---- first-run tutorial ----
+  var TUTORIAL_KEY = "pip_seen_tutorial";
+  function seenTutorial() { try { return localStorage.getItem(TUTORIAL_KEY) === "1"; } catch (e) { return false; } }
+  function maybeShowTutorial() {
+    if (!seenTutorial()) { tutorialOpen = true; paused = true; show("tutorial", true); }
+    else if (isTouch) showTouchHint();
+  }
+  function dismissTutorial() {
+    if (!tutorialOpen) return;
+    tutorialOpen = false; paused = false;
+    try { localStorage.setItem(TUTORIAL_KEY, "1"); } catch (e) {}
+    show("tutorial", false);
+    last = 0;
+    if (isTouch) showTouchHint();
+  }
+
+  // ---- transition fade (visual flourish; state changes stay synchronous) ----
+  var fadeEl = document.getElementById("fade");
+  function fadeFlash() {
+    if (!fadeEl) return;
+    fadeEl.classList.add("show");
+    setTimeout(function () { fadeEl.classList.remove("show"); }, reduceMotion ? 90 : 240);
+  }
+
+  // ---- cosmetics closet (on the level-select screen) ----
+  function renderCloset() {
+    if (!window.DINOCosmetics) return;
+    var row = document.getElementById("closetRow");
+    if (!row) return;
+    var stars = totalStars();
+    var sl = document.getElementById("closetStars");
+    if (sl) sl.textContent = stars + " ★";
+    var equipped = window.DINOCosmetics.getEquipped();
+    row.innerHTML = "";
+    var items = window.DINOCosmetics.items;
+    for (var i = 0; i < items.length; i++) {
+      (function (item) {
+        var unlocked = window.DINOCosmetics.isUnlocked(item.id, stars);
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "swatch" + (item.id === equipped ? " is-equipped" : "") + (unlocked ? "" : " is-locked");
+        b.setAttribute("role", "listitem");
+        b.setAttribute("aria-label", item.name + (unlocked ? (item.id === equipped ? " (equipped)" : "") : " (locked: " + item.cost + " stars)"));
+        b.disabled = !unlocked;
+        var cv = document.createElement("canvas");
+        cv.width = 56; cv.height = 56;
+        var cx2 = cv.getContext("2d");
+        var pv = { x: 6, y: -4, w: 44, h: 52 };
+        S.dino(cx2, pv, { face: 1 });
+        var prev = window.DINOCosmetics.getEquipped();
+        try {
+          window.DINOCosmetics.setEquipped(item.id);
+          window.DINOCosmetics.drawOn(cx2, pv, { face: 1 });
+        } finally {
+          window.DINOCosmetics.setEquipped(prev);
+        }
+        b.appendChild(cv);
+        var nm = document.createElement("span");
+        nm.textContent = item.name; b.appendChild(nm);
+        if (!unlocked) {
+          var cost = document.createElement("span"); cost.className = "cost"; cost.textContent = item.cost + "★"; b.appendChild(cost);
+          var lk = document.createElement("span"); lk.className = "lock"; lk.textContent = "🔒"; b.appendChild(lk);
+        }
+        b.addEventListener("click", function () {
+          if (!window.DINOCosmetics.isUnlocked(item.id, totalStars())) return;
+          window.DINOCosmetics.setEquipped(item.id);
+          renderCloset();
+        });
+        row.appendChild(b);
+      })(items[i]);
+    }
+  }
+
   // ---- level select ----
   function refreshLevelNodes() {
     var nodes = document.querySelectorAll("#levelSelect .node");
@@ -806,10 +984,19 @@
       nodes[n].classList.toggle("is-done", done);
       nodes[n].classList.toggle("is-locked", !unlocked);
       nodes[n].disabled = !unlocked;
+      var sr = nodes[n].querySelector(".node-stars");
+      if (!sr) {
+        sr = document.createElement("span");
+        sr.className = "node-stars";
+        sr.setAttribute("aria-hidden", "true");
+        nodes[n].appendChild(sr);
+      }
+      sr.innerHTML = starHTML(bestStars(idx));
     }
   }
   function showLevelSelect() {
     mode = "select";
+    paused = false;
     clearHeld();
     A.stopMusic();
     show("startScreen", false);
@@ -817,33 +1004,49 @@
     show("hud", false);
     show("touch", false);
     show("muteBtn", false);
+    show("pauseBtn", false);
+    show("pauseOverlay", false);
     refreshLevelNodes();
+    renderCloset();
     show("levelSelect", true);
   }
   function startLevel(idx) {
     if (!isUnlocked(idx)) return;
     A.init();
-    A.startMusic();
     clearHeld();
     jumpQueued = false; roarQueued = false; jumpHeld = false;
     movedYet = false; playClock = 0;
+    paused = false;
+    fadeFlash();
     buildLevel(idx);
+    A.startMusic(world.theme);
     mode = "play";
     show("levelSelect", false);
     show("startScreen", false);
     show("winScreen", false);
+    show("pauseOverlay", false);
     show("hud", true);
     show("muteBtn", true);
-    if (isTouch) { show("touch", true); showTouchHint(); }
+    show("pauseBtn", true);
+    if (isTouch) show("touch", true);
+    maybeShowTutorial();
   }
 
   function winGame() {
     if (mode === "win") return;
     mode = "win";
+    paused = false;
     clearHeld();
     A.win();
     winTimer = 1.6;
     markComplete(currentLevel);
+    var earned = computeStars();
+    recordStars(currentLevel, earned);
+    var winStars = document.getElementById("winStars");
+    if (winStars) {
+      winStars.innerHTML = starHTML(earned);
+      winStars.setAttribute("aria-label", earned + " of 3 stars");
+    }
     document.getElementById("wApple").textContent = counts.apple;
     document.getElementById("wEgg").textContent = counts.egg;
     document.getElementById("wStar").textContent = counts.star;
@@ -859,8 +1062,11 @@
       nextBtn.classList.toggle("hidden", !hasNext);
       if (hasNext) nextBtn.textContent = "▶ NEXT: " + LEVELS[currentLevel + 1].name.toUpperCase();
     }
+    fadeFlash();
     show("hud", false);
     show("touch", false);
+    show("pauseBtn", false);
+    show("muteBtn", false);
     show("winScreen", true);
   }
 
@@ -896,6 +1102,17 @@
     muteBtn.setAttribute("aria-label", m ? "Turn sound on" : "Turn sound off");
   });
 
+  document.getElementById("pauseBtn").addEventListener("click", togglePause);
+  document.getElementById("resumeBtn").addEventListener("click", function () { setPaused(false); });
+  document.getElementById("pauseMapBtn").addEventListener("click", function () { setPaused(false); showLevelSelect(); });
+  document.getElementById("pauseSettingsBtn").addEventListener("click", function () { show("pauseOverlay", false); openSettings("pause"); });
+  document.getElementById("startSettingsBtn").addEventListener("click", function () { openSettings("start"); });
+  document.getElementById("settingsBackBtn").addEventListener("click", closeSettings);
+  document.getElementById("optMusic").addEventListener("click", function () { toggleSetting("music"); });
+  document.getElementById("optSound").addEventListener("click", function () { toggleSetting("sound"); });
+  document.getElementById("optMotion").addEventListener("click", function () { toggleSetting("reduceMotion"); });
+  document.getElementById("tutorialOkBtn").addEventListener("click", dismissTutorial);
+
   document.getElementById("rotateDismiss").addEventListener("click", function () {
     rotateDismissed = true;
     updateRotateNudge();
@@ -914,7 +1131,7 @@
     last = now;
     if (dt > 0.033) dt = 0.033;
 
-    if (mode === "play") update(dt);
+    if (mode === "play" && !paused) update(dt);
     else t += dt;
     if (W) W.update(dt, cssW, cssH);   // weather animates on every screen
 
@@ -954,11 +1171,15 @@
     showSelect: showLevelSelect,
     markComplete: markComplete,
     isComplete: isComplete,
-    resetProgress: function () { saveProgress({ done: [] }); },
+    totalStars: totalStars,
+    bestStars: bestStars,
+    resetProgress: function () { saveProgress({ done: [] }); saveStars({}); },
     warp: function (x, y) { if (player) { player.x = x; if (y != null) player.y = y; player.vx = 0; player.vy = 0; } }
   };
 
   // ---- boot ----
+  settings = loadSettings();
+  applySettings();   // mute state + reduceMotion applied before first frame
   resize();
   buildLevel(0);     // so the meadow scene shows behind the start card
   mode = "start";

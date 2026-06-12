@@ -5,7 +5,10 @@
 
   var ctx = null;
   var master = null;
-  var muted = false;
+  var sfxGain = null;
+  var muted = false;       // master mute (legacy: zeroes everything)
+  var musicMuted = false;  // music-only mute
+  var sfxMuted = false;    // sfx-only mute
 
   function ensure() {
     if (ctx) return true;
@@ -15,6 +18,9 @@
     master = ctx.createGain();
     master.gain.value = 0.5;
     master.connect(ctx.destination);
+    sfxGain = ctx.createGain();
+    sfxGain.gain.value = sfxMuted ? 0 : 1;
+    sfxGain.connect(master);
     return true;
   }
 
@@ -29,7 +35,7 @@
     g.gain.exponentialRampToValueAtTime(peak, t0 + Math.min(0.02, dur * 0.3));
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     osc.connect(g);
-    g.connect(master);
+    g.connect(sfxGain);
     osc.start(t0);
     osc.stop(t0 + dur + 0.02);
   }
@@ -43,6 +49,16 @@
       if (master) master.gain.value = m ? 0 : 0.5;
     },
     isMuted: function () { return muted; },
+    setMusicMuted: function (m) {
+      musicMuted = m;
+      if (musicGain) musicGain.gain.value = m ? 0 : 0.8;
+    },
+    isMusicMuted: function () { return musicMuted; },
+    setSfxMuted: function (m) {
+      sfxMuted = m;
+      if (sfxGain) sfxGain.gain.value = m ? 0 : 1;
+    },
+    isSfxMuted: function () { return sfxMuted; },
 
     jump: function () {
       if (muted || !ensure()) return;
@@ -92,21 +108,81 @@
       tone(660, 660, t, 0.1, "triangle", 0.24);
       tone(990, 990, t + 0.08, 0.14, "triangle", 0.22);
       tone(1320, 1320, t + 0.18, 0.16, "sine", 0.18);
+    },
+    // cheerful "yum"/chime, a touch different per food kind
+    eat: function (kind) {
+      if (muted || sfxMuted || !ensure()) return;
+      var t = ctx.currentTime;
+      if (kind === "chili") {
+        tone(720, 1040, t, 0.08, "triangle", 0.24);
+        tone(1180, 1180, t + 0.07, 0.1, "sine", 0.2);
+      } else if (kind === "balloon") {
+        tone(980, 1320, t, 0.07, "sine", 0.2);
+        tone(1568, 1568, t + 0.06, 0.11, "triangle", 0.18);
+      } else if (kind === "lolly") {
+        tone(1047, 1047, t, 0.07, "triangle", 0.22);
+        tone(1319, 1319, t + 0.06, 0.09, "triangle", 0.2);
+        tone(1760, 1760, t + 0.13, 0.12, "sine", 0.16);
+      } else {
+        tone(523, 392, t, 0.06, "sine", 0.22);
+        tone(784, 988, t + 0.05, 0.12, "triangle", 0.24);
+      }
+    },
+    // very soft, short footstep tick
+    step: function () {
+      if (muted || sfxMuted || !ensure()) return;
+      var t = ctx.currentTime;
+      tone(180, 120, t, 0.04, "sine", 0.05);
     }
   };
 
-  // ---- gentle looping background music (procedural, no files) ----
+  // ---- gentle looping background music (procedural; per-biome variants) ----
   var musicGain = null, musicTimer = null, step = 0, playing = false;
-  var STEP = 0.19; // seconds per step
-  // a soft, bouncy major-key loop; 0 = rest
-  var MELODY = [
-    523, 0, 659, 0, 784, 0, 659, 0, 587, 0, 698, 0, 880, 0, 784, 0,
-    523, 0, 659, 0, 784, 0, 1047, 0, 988, 0, 784, 0, 659, 0, 587, 0
-  ];
-  var BASS = [
-    131, 0, 0, 0, 165, 0, 0, 0, 147, 0, 0, 0, 196, 0, 0, 0,
-    131, 0, 0, 0, 165, 0, 0, 0, 147, 0, 0, 0, 98, 0, 196, 0
-  ];
+  var curTheme = "meadow", curVariant = null;
+
+  var VARIANTS = {
+    meadow: {
+      STEP: 0.19,
+      melWave: "triangle", melPeak: 0.16, melDurMul: 1.7,
+      bassWave: "sine", bassPeak: 0.22, bassDurMul: 2.1,
+      MELODY: [
+        523, 0, 659, 0, 784, 0, 659, 0, 587, 0, 698, 0, 880, 0, 784, 0,
+        523, 0, 659, 0, 784, 0, 1047, 0, 988, 0, 784, 0, 659, 0, 587, 0
+      ],
+      BASS: [
+        131, 0, 0, 0, 165, 0, 0, 0, 147, 0, 0, 0, 196, 0, 0, 0,
+        131, 0, 0, 0, 165, 0, 0, 0, 147, 0, 0, 0, 98, 0, 196, 0
+      ]
+    },
+    beach: {
+      STEP: 0.23,
+      melWave: "sine", melPeak: 0.15, melDurMul: 2.1,
+      bassWave: "sine", bassPeak: 0.2, bassDurMul: 2.4,
+      MELODY: [
+        440, 0, 0, 523, 0, 587, 0, 0, 659, 0, 587, 0, 523, 0, 0, 0,
+        392, 0, 0, 440, 0, 523, 0, 0, 587, 0, 523, 0, 440, 0, 0, 0
+      ],
+      BASS: [
+        110, 0, 0, 0, 0, 0, 0, 0, 147, 0, 0, 0, 0, 0, 0, 0,
+        98, 0, 0, 0, 0, 0, 0, 0, 131, 0, 0, 0, 0, 0, 0, 0
+      ]
+    },
+    night: {
+      STEP: 0.27,
+      melWave: "triangle", melPeak: 0.11, melDurMul: 2.4,
+      bassWave: "sine", bassPeak: 0.16, bassDurMul: 3.0,
+      MELODY: [
+        330, 0, 0, 0, 392, 0, 0, 0, 330, 0, 0, 0, 294, 0, 0, 0,
+        262, 0, 0, 0, 294, 0, 0, 0, 330, 0, 0, 0, 0, 0, 0, 0
+      ],
+      BASS: [
+        82, 0, 0, 0, 0, 0, 0, 0, 98, 0, 0, 0, 0, 0, 0, 0,
+        65, 0, 0, 0, 0, 0, 0, 0, 73, 0, 0, 0, 0, 0, 0, 0
+      ]
+    }
+  };
+
+  function pickVariant(theme) { return VARIANTS[theme] || VARIANTS.meadow; }
 
   function mnote(freq, dur, type, peak) {
     var t0 = ctx.currentTime;
@@ -119,24 +195,38 @@
     osc.start(t0); osc.stop(t0 + dur + 0.02);
   }
   function mtick() {
-    if (!ctx || muted) { step++; return; }
-    var m = MELODY[step % MELODY.length];
-    if (m) mnote(m, STEP * 1.7, "triangle", 0.16);
-    var b = BASS[step % BASS.length];
-    if (b) mnote(b, STEP * 2.1, "sine", 0.22);
+    var v = curVariant;
+    if (!ctx || muted || musicMuted || !v) { step++; return; }
+    var m = v.MELODY[step % v.MELODY.length];
+    if (m) mnote(m, v.STEP * v.melDurMul, v.melWave, v.melPeak);
+    var b = v.BASS[step % v.BASS.length];
+    if (b) mnote(b, v.STEP * v.bassDurMul, v.bassWave, v.bassPeak);
     step++;
   }
+  function scheduleTick() {
+    if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+    if (curVariant) musicTimer = setInterval(mtick, curVariant.STEP * 1000);
+  }
 
-  SFX.startMusic = function () {
-    if (!ensure() || playing) return;
+  // startMusic() defaults to 'meadow'; if already playing and theme differs, swap.
+  SFX.startMusic = function (theme) {
+    if (!ensure()) return;
+    theme = theme || "meadow";
     if (!musicGain) {
       musicGain = ctx.createGain();
-      musicGain.gain.value = 0.8;
+      musicGain.gain.value = musicMuted ? 0 : 0.8;
       musicGain.connect(master);
     }
+    if (playing) {
+      if (theme !== curTheme) {
+        curTheme = theme; curVariant = pickVariant(theme); step = 0; scheduleTick();
+      }
+      return;
+    }
+    curTheme = theme; curVariant = pickVariant(theme);
     playing = true;
     mtick();
-    musicTimer = setInterval(mtick, STEP * 1000);
+    scheduleTick();
   };
   SFX.stopMusic = function () {
     playing = false;

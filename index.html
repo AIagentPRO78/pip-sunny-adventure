@@ -7,6 +7,10 @@
   <meta name="theme-color" content="#8fd3ff" />
   <title>Pip's Sunny Adventure</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>%F0%9F%A6%96</text></svg>" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Pip" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -20,6 +24,7 @@
       <div class="tally"><span class="ico star"></span><span id="nStar">0</span></div>
     </div>
 
+    <button id="pauseBtn" class="corner-btn hidden" aria-label="Pause game">⏸</button>
     <button id="muteBtn" class="corner-btn hidden" aria-label="Toggle sound">🔊</button>
 
     <!-- On-screen touch controls -->
@@ -43,6 +48,7 @@
         <h1>Pip's Sunny<br />Adventure</h1>
         <p class="sub">Help Pip the T-rex collect goodies and reach the flag!</p>
         <button id="playBtn" class="big-btn">▶ PLAY</button>
+        <button id="startSettingsBtn" class="small-btn gear-btn" aria-label="Settings">⚙️ Settings</button>
         <div class="legend">
           <div class="keys key-only">
             <span><kbd>←</kbd><kbd>→</kbd> move</span>
@@ -80,6 +86,10 @@
             <span class="node-badge" aria-hidden="true"></span>
           </button>
         </div>
+        <div id="closet" class="closet" aria-label="Pip's closet">
+          <h3 class="closet-title">Pip's Closet <span id="closetStars" class="closet-stars">0 ★</span></h3>
+          <div id="closetRow" class="closet-row" role="list"></div>
+        </div>
         <button id="mapBackBtn" class="small-btn">⌂ Home</button>
       </div>
     </div>
@@ -89,6 +99,7 @@
       <div class="card">
         <h1>You did it! 🎉</h1>
         <p class="sub">Pip reached the flag!</p>
+        <div class="win-stars" id="winStars" aria-label="Stars earned">★★★</div>
         <div class="results">
           <div class="res"><span class="ico apple"></span><span id="wApple">0</span></div>
           <div class="res"><span class="ico egg"></span><span id="wEgg">0</span></div>
@@ -102,6 +113,57 @@
       </div>
     </div>
 
+    <!-- Pause overlay -->
+    <div id="pauseOverlay" class="screen hidden" role="dialog" aria-modal="true" aria-label="Game paused">
+      <div class="card pause-card">
+        <h1>Paused</h1>
+        <p class="sub">Take a breather, Pip!</p>
+        <div class="win-actions">
+          <button id="resumeBtn" class="big-btn">▶ RESUME</button>
+          <button id="pauseSettingsBtn" class="small-btn">⚙️ Settings</button>
+          <button id="pauseMapBtn" class="small-btn">🗺️ Map</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div id="settings" class="screen hidden" role="dialog" aria-modal="true" aria-label="Settings">
+      <div class="card settings-card">
+        <h1>Settings</h1>
+        <div class="toggles" role="group" aria-label="Game options">
+          <button class="toggle-row" id="optMusic" role="switch" aria-checked="true">
+            <span class="toggle-label">🎵 Music</span>
+            <span class="toggle-pill" aria-hidden="true"><span class="toggle-knob"></span></span>
+          </button>
+          <button class="toggle-row" id="optSound" role="switch" aria-checked="true">
+            <span class="toggle-label">🔊 Sound</span>
+            <span class="toggle-pill" aria-hidden="true"><span class="toggle-knob"></span></span>
+          </button>
+          <button class="toggle-row" id="optMotion" role="switch" aria-checked="false">
+            <span class="toggle-label">🌿 Reduced Motion</span>
+            <span class="toggle-pill" aria-hidden="true"><span class="toggle-knob"></span></span>
+          </button>
+        </div>
+        <div class="actions"><button id="settingsBackBtn" class="small-btn">‹ Back</button></div>
+      </div>
+    </div>
+
+    <!-- First-run tutorial -->
+    <div id="tutorial" class="screen hidden" role="dialog" aria-modal="true" aria-label="How to play">
+      <div class="card tut-card">
+        <h1>How to Play</h1>
+        <ul class="tut-rows">
+          <li><span class="tut-ico">◀▶</span><span>Move with arrows or buttons</span></li>
+          <li><span class="tut-ico">⬆</span><span>JUMP — tap JUMP or press Space</span></li>
+          <li><span class="tut-ico">🦖</span><span>ROAR — press R to roar</span></li>
+          <li><span class="tut-ico">🍎</span><span>Collect fruit, eggs and stars</span></li>
+          <li><span class="tut-ico">🚩</span><span>Reach the flag to finish</span></li>
+          <li><span class="tut-ico">🥚</span><span>Free the caged baby dino!</span></li>
+        </ul>
+        <button id="tutorialOkBtn" class="big-btn">Got it!</button>
+      </div>
+    </div>
+
     <!-- Rotate-to-landscape nudge (touch + portrait only) -->
     <div id="rotateNudge" class="hidden" role="dialog" aria-label="Turn your phone sideways">
       <div class="rotate-card">
@@ -111,13 +173,24 @@
         <button id="rotateDismiss" class="small-btn">Play this way</button>
       </div>
     </div>
+
+    <div id="fade" class="fade" aria-hidden="true"></div>
   </div>
 
   <script src="audio.js"></script>
   <script src="sprites.js"></script>
   <script src="themes.js"></script>
   <script src="weather.js"></script>
+  <script src="decor.js"></script>
+  <script src="cosmetics.js"></script>
   <script src="levels.js"></script>
   <script src="game.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").catch(function () {});
+      });
+    }
+  </script>
 </body>
 </html>
