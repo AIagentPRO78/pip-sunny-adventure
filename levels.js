@@ -159,6 +159,96 @@
       stash: stash(2980, 430, 8),
       checkpoints: [{ x: 1000 }, { x: 2980 }, { x: 4400 }],
       decor: { trees: 16, bushes: 20, clouds: 12, butterflies: 7 }
+    },
+
+    // ===== LEVEL 4 — Snowy Peaks (snow) =====
+    {
+      name: "Snowy Peaks", theme: "snow",
+      worldW: 5600, flagX: 5400, startX: 120, startY: 340,
+      platforms: [
+        grnd(0, 760), grnd(900, 700), grnd(1760, 820), grnd(2740, 760), grnd(3660, 1940),
+        plat(540, 350, 150), plat(780, 270, 140), plat(1040, 200, 140),
+        plat(1380, 330, 150), plat(1600, 250, 140), plat(2120, 320, 150),
+        plat(2400, 250, 150), plat(2640, 320, 150), plat(3120, 320, 150),
+        plat(3380, 250, 160), plat(4000, 320, 150), plat(4260, 250, 150),
+        plat(4760, 300, 150), plat(4980, 230, 150)
+      ],
+      collectibles: [
+        coll(300, 415, "apple"), coll(500, 415, "apple"), coll(600, 310, "apple"),
+        coll(845, 230, "apple"), coll(1440, 290, "apple"), coll(1660, 210, "apple"),
+        coll(2180, 280, "apple"), coll(2460, 210, "apple"), coll(3180, 280, "apple"),
+        coll(4060, 280, "apple"), coll(4820, 260, "apple"),
+        coll(680, 415, "egg"), coll(1180, 415, "egg"), coll(2300, 415, "egg"),
+        coll(3420, 415, "egg"), coll(5040, 415, "egg"),
+        coll(1105, 155, "star"), coll(3440, 205, "star"), coll(5045, 185, "star")
+      ],
+      critters: [
+        critterAt(620, 540, 740, 443), critterAt(1240, 920, 1580, 443),
+        critterAt(2080, 1780, 2540, 443), critterAt(3100, 2780, 3460, 443),
+        critterAt(2400, 2320, 2480, 313)
+      ],
+      blocks: [
+        box(1040, 300, "steak"), box(1880, 300, "chili"), box(2780, 300, "balloon"),
+        box(3580, 300, "lolly"), box(4600, 300, "steak")
+      ],
+      pads: [pad(860, 444), pad(3440, 314)],
+      movers: [moverH(1660, 320, 140, 130, 1.0, 0.3), moverV(4400, 360, 130, 76, 1.0, 1.0)],
+      baby: cage(2960),
+      coins: [
+        coin(380, 415), coin(600, 280), coin(845, 200),
+        coin(1040, 165), coin(1440, 295), coin(2120, 290),
+        coin(2640, 290), coin(3120, 290), coin(3440, 175),
+        coin(4260, 220), coin(4980, 200)
+      ],
+      secrets: [secret(1040, 55, "star"), secret(2400, 70, "egg"), secret(4980, 70, "apple")],
+      stash: stash(2740, 430, 8),
+      checkpoints: [{ x: 900 }, { x: 2740 }, { x: 4200 }],
+      decor: { trees: 14, bushes: 16, clouds: 12, butterflies: 4 }
+    },
+
+    // ===== LEVEL 5 — Frosty Falls (snow) =====
+    {
+      name: "Frosty Falls", theme: "snow",
+      worldW: 5800, flagX: 5600, startX: 120, startY: 340,
+      platforms: [
+        grnd(0, 840), grnd(1000, 720), grnd(1900, 760), grnd(2820, 880), grnd(3860, 1940),
+        plat(620, 360, 150), plat(880, 280, 140), plat(1140, 220, 140),
+        plat(1460, 340, 150), plat(1700, 260, 140), plat(1960, 200, 150),
+        plat(2360, 330, 150), plat(2620, 250, 150), plat(2960, 320, 150),
+        plat(3260, 250, 160), plat(3540, 330, 150), plat(4220, 320, 150),
+        plat(4480, 250, 150), plat(4980, 300, 150), plat(5240, 230, 150)
+      ],
+      collectibles: [
+        coll(320, 415, "apple"), coll(520, 415, "apple"), coll(680, 320, "apple"),
+        coll(940, 240, "apple"), coll(1520, 300, "apple"), coll(2020, 160, "apple"),
+        coll(2420, 290, "apple"), coll(2680, 210, "apple"), coll(3600, 290, "apple"),
+        coll(4280, 280, "apple"), coll(5040, 260, "apple"),
+        coll(780, 415, "egg"), coll(1340, 415, "egg"), coll(2480, 415, "egg"),
+        coll(3680, 415, "egg"), coll(5320, 415, "egg"),
+        coll(1205, 175, "star"), coll(3320, 205, "star"), coll(5305, 185, "star")
+      ],
+      critters: [
+        critterAt(700, 620, 820, 443), critterAt(1340, 1020, 1700, 443),
+        critterAt(2200, 1920, 2560, 443), critterAt(3300, 2840, 3700, 443),
+        critterAt(1960, 1880, 2040, 313)
+      ],
+      blocks: [
+        box(1120, 300, "lolly"), box(2080, 300, "steak"), box(2900, 300, "chili"),
+        box(3820, 300, "balloon"), box(4720, 300, "lolly")
+      ],
+      pads: [pad(960, 444), pad(3540, 314)],
+      movers: [moverH(2100, 320, 140, 120, 1.05, 0.5), moverV(4400, 360, 130, 80, 1.0, 1.4)],
+      baby: cage(3100),
+      coins: [
+        coin(420, 415), coin(680, 280), coin(940, 200),
+        coin(1140, 185), coin(1520, 305), coin(2360, 290),
+        coin(2960, 290), coin(3540, 295), coin(3320, 175),
+        coin(4480, 220), coin(5240, 200)
+      ],
+      secrets: [secret(1140, 60, "star"), secret(3260, 70, "egg"), secret(5240, 70, "apple")],
+      stash: stash(2820, 430, 8),
+      checkpoints: [{ x: 1000 }, { x: 2820 }, { x: 4400 }],
+      decor: { trees: 14, bushes: 16, clouds: 12, butterflies: 4 }
     }
   ];
 

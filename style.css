@@ -436,6 +436,7 @@ body.is-touch .touch-only { display: flex; }
 .node-dot.meadow { background: radial-gradient(circle at 35% 30%, #c7ecaf, #6fcf57); }
 .node-dot.beach { background: radial-gradient(circle at 35% 30%, #ffd9a0, #ff9e7d); }
 .node-dot.night { background: radial-gradient(circle at 35% 30%, #3d5a8a, #10183a); }
+.node-dot.snow { background: radial-gradient(circle at 35% 30%, #ffffff, #aacfe8); }
 .node-name { font-weight: 800; font-size: clamp(12px, 3vw, 15px); color: #6a627d; text-align: center; }
 .node-badge {
   position: absolute;

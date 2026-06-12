@@ -240,6 +240,150 @@
     circle(ctx, x - 2, capY - 9, 1.8); ctx.fill();
   }
 
+  /* ---------- snow: pine tree ----------
+     Brown trunk with stacked green triangular tiers, each capped with
+     a dab of white snow. Sways very gently with t. */
+  function pine(ctx, x, groundY, t) {
+    var sway = Math.sin(t * 1.1 + x) * 2;
+    // trunk
+    ctx.fillStyle = "#9a6a3c";
+    roundRect(ctx, x - 5, groundY - 18, 10, 20, 3); ctx.fill();
+    ctx.fillStyle = "#b07a44";
+    roundRect(ctx, x - 5, groundY - 18, 4, 20, 2); ctx.fill();
+
+    // tiers: [bottomY, halfWidth, height]; drawn bottom-up
+    var tiers = [[groundY - 14, 34, 34], [groundY - 40, 28, 32], [groundY - 64, 20, 30]];
+    var greens = ["#2f7a48", "#3f8f5a", "#4fa869"];
+    for (var i = 0; i < tiers.length; i++) {
+      var by = tiers[i][0], hw = tiers[i][1], h = tiers[i][2];
+      var tipX = x + sway * (i + 1) * 0.4;
+      ctx.fillStyle = greens[i];
+      ctx.beginPath();
+      ctx.moveTo(tipX, by - h);
+      ctx.lineTo(x + hw, by);
+      ctx.lineTo(x - hw, by);
+      ctx.closePath();
+      ctx.fill();
+      // white snow cap draped over the tier tip
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(tipX, by - h);
+      ctx.quadraticCurveTo(tipX + hw * 0.4, by - h * 0.55, tipX + hw * 0.28, by - h * 0.4);
+      ctx.quadraticCurveTo(tipX, by - h * 0.62, tipX - hw * 0.28, by - h * 0.4);
+      ctx.quadraticCurveTo(tipX - hw * 0.4, by - h * 0.55, tipX, by - h);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  /* ---------- snow: snowman ----------
+     Three stacked snowballs, coal eyes + buttons, carrot nose, twig
+     arms, and a little red scarf that flutters with t. */
+  function snowman(ctx, x, groundY, t) {
+    var flutter = Math.sin(t * 3 + x) * 3;
+    var botY = groundY - 26, midY = groundY - 60, headY = groundY - 84;
+
+    // snowballs (largest at bottom)
+    ctx.fillStyle = "#ffffff";
+    circle(ctx, x, botY, 26); ctx.fill();
+    circle(ctx, x, midY, 20); ctx.fill();
+    circle(ctx, x, headY, 15); ctx.fill();
+    // soft cool shading on the lower-left
+    ctx.fillStyle = "#f0f8ff";
+    circle(ctx, x - 8, botY + 6, 14); ctx.fill();
+
+    // stick arms
+    ctx.strokeStyle = "#9a6a3c";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x - 16, midY - 2); ctx.lineTo(x - 38, midY - 10);
+    ctx.moveTo(x + 16, midY - 2); ctx.lineTo(x + 38, midY - 12);
+    ctx.stroke();
+    ctx.lineCap = "butt";
+
+    // red scarf around the neck
+    ctx.fillStyle = "#e8534d";
+    roundRect(ctx, x - 16, midY - 19, 32, 8, 4); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + 6, midY - 14);
+    ctx.lineTo(x + 14, midY - 14);
+    ctx.lineTo(x + 12 + flutter, midY + 6);
+    ctx.lineTo(x + 4 + flutter, midY + 6);
+    ctx.closePath();
+    ctx.fill();
+
+    // coal eyes + buttons
+    ctx.fillStyle = "#3a3a44";
+    circle(ctx, x - 5, headY - 2, 2.2); ctx.fill();
+    circle(ctx, x + 5, headY - 2, 2.2); ctx.fill();
+    circle(ctx, x, midY, 2.2); ctx.fill();
+    circle(ctx, x, midY + 9, 2.2); ctx.fill();
+
+    // carrot nose
+    ctx.fillStyle = "#ff9a3d";
+    ctx.beginPath();
+    ctx.moveTo(x, headY + 2);
+    ctx.lineTo(x + 16, headY + 4);
+    ctx.lineTo(x, headY + 6);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /* ---------- snow: igloo ----------
+     Ice-blue dome built from curved brick rows with a darker arched
+     entrance tunnel and a faint cool highlight. */
+  function igloo(ctx, x, groundY, t) {
+    var R = 46;
+    var cy = groundY;
+
+    // dome body
+    var g = ctx.createLinearGradient(x, groundY - R, x, groundY);
+    g.addColorStop(0, "#f0f8ff");
+    g.addColorStop(1, "#bcdcff");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, cy, R, Math.PI, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // curved ice-brick rows
+    ctx.strokeStyle = "#9fc9ee";
+    ctx.lineWidth = 2;
+    var rows = [0.66, 0.4];
+    for (var r = 0; r < rows.length; r++) {
+      var rr = R * rows[r];
+      ctx.beginPath();
+      ctx.arc(x, cy, rr, Math.PI, 0);
+      ctx.stroke();
+    }
+    // vertical brick seams along the lowest row
+    ctx.beginPath();
+    for (var a = -0.9; a <= 0.9; a += 0.45) {
+      var ix = x + Math.cos(Math.PI / 2 - a) * R;
+      ctx.moveTo(x + Math.cos(Math.PI / 2 - a) * R * 0.66, cy - Math.sin(Math.PI / 2 - a) * R * 0.66);
+      ctx.lineTo(ix, cy - Math.sin(Math.PI / 2 - a) * R);
+    }
+    ctx.stroke();
+
+    // arched entrance tunnel
+    ctx.fillStyle = "#cfe8ff";
+    roundRect(ctx, x - 16, groundY - 26, 32, 26, 6); ctx.fill();
+    ctx.fillStyle = "#9fc9ee";
+    ctx.beginPath();
+    ctx.arc(x, groundY - 2, 12, Math.PI, 0);
+    ctx.lineTo(x + 12, groundY);
+    ctx.lineTo(x - 12, groundY);
+    ctx.closePath();
+    ctx.fill();
+
+    // faint cool highlight
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.beginPath();
+    ctx.ellipse(x - 14, groundY - R * 0.7, 8, 16, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   /* ---------- placement ----------
      Spread props across the world for the biome. Returns
      [{kind, x}, ...]; meadow keeps the existing trees/bushes so it
@@ -247,7 +391,8 @@
      within [200, worldW-200]. */
   var KINDS = {
     beach: ["palm", "sandcastle", "umbrella"],
-    night: ["crystal", "mushroom"]
+    night: ["crystal", "mushroom"],
+    snow: ["pine", "snowman", "igloo"]
   };
 
   function place(theme, worldW) {
@@ -276,6 +421,9 @@
     else if (kind === "umbrella") umbrella(ctx, x, groundY, t);
     else if (kind === "crystal") crystal(ctx, x, groundY, t);
     else if (kind === "mushroom") mushroom(ctx, x, groundY, t);
+    else if (kind === "pine") pine(ctx, x, groundY, t);
+    else if (kind === "snowman") snowman(ctx, x, groundY, t);
+    else if (kind === "igloo") igloo(ctx, x, groundY, t);
   }
 
   window.DINODecor = {

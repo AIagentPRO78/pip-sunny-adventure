@@ -41,10 +41,19 @@
       hillMid: "#1c3247",
       weather: "fireflies",
       label: "Starry Night"
+    },
+    snow: {
+      skyTop: "#cfeaff",
+      skyMid: "#e4f3ff",
+      skyBot: "#f7fcff",
+      hillFar: "#dcecf7",
+      hillMid: "#c2ddee",
+      weather: "snow",
+      label: "Snowy Peaks"
     }
   };
 
-  var IDS = ["meadow", "beach", "night"];
+  var IDS = ["meadow", "beach", "night", "snow"];
 
   function get(id) {
     return THEMES[id] || THEMES.meadow;
@@ -151,6 +160,24 @@
     ctx.globalAlpha = 1;
   }
 
+  // Pale winter sun: a soft white-gold disc with a cool halo and no harsh
+  // rays, so the snowy sky stays bright but calm.
+  function winterSun(ctx, x, y, r, t) {
+    var halo = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 2.4);
+    halo.addColorStop(0, "rgba(255,250,225,0.45)");
+    halo.addColorStop(1, "rgba(255,250,225,0)");
+    ctx.fillStyle = halo;
+    circle(ctx, x, y, r * 2.4);
+    ctx.fill();
+    var bob = Math.sin(t * 0.3) * 1.5;
+    circle(ctx, x, y + bob, r);
+    ctx.fillStyle = "#fff4d2";
+    ctx.fill();
+    circle(ctx, x, y + bob, r - 6);
+    ctx.fillStyle = "#fffaec";
+    ctx.fill();
+  }
+
   /* ---------- public sky painter ----------
      Screen space (0..w, 0..h): themed gradient + celestial body,
      subtly animated by t. Drop-in replacement for S.sky. */
@@ -165,6 +192,8 @@
     } else if (id === "beach") {
       // big low sun near the horizon, anchored to canvas height
       sunsetSun(ctx, w * 0.7, h * 0.66, 60, t);
+    } else if (id === "snow") {
+      winterSun(ctx, w * 0.78, h * 0.2, 40, t);
     } else {
       sunBody(ctx, w * 0.2, h * 0.22, 46, t);
     }

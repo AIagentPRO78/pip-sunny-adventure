@@ -19,6 +19,7 @@
     leaves: 38,
     rain: 55,
     fireflies: 30,
+    snow: 46,
     none: 0
   };
   var MAX_PARTICLES = 60;
@@ -111,11 +112,26 @@
     };
   }
 
+  function spawnSnow(w, h, fresh) {
+    var slow = reduce ? 0.6 : 1;
+    return {
+      x: rand(0, w),
+      y: fresh ? rand(-h, 0) : rand(-30, -6),
+      r: rand(2, 5),
+      vy: rand(22, 42) * slow,
+      swayA: rand(10, 26),
+      swayHz: rand(0.2, 0.5),
+      phase: rand(0, TAU),
+      alpha: rand(0.6, 0.95)
+    };
+  }
+
   function spawn(type, w, h, fresh) {
     if (type === "petals") return spawnPetal(w, h, fresh);
     if (type === "leaves") return spawnLeaf(w, h, fresh);
     if (type === "rain") return spawnRain(w, h, fresh);
     if (type === "fireflies") return spawnFirefly(w, h, fresh);
+    if (type === "snow") return spawnSnow(w, h, fresh);
     return null;
   }
 
@@ -137,7 +153,7 @@
 
   function set(type, reduceMotion) {
     if (type !== "petals" && type !== "leaves" && type !== "rain" &&
-        type !== "fireflies" && type !== "none") {
+        type !== "fireflies" && type !== "snow" && type !== "none") {
       type = "none";
     }
     current = type;
@@ -187,6 +203,9 @@
         if (p.y > h + p.len || p.x > w + 40) {
           particles[i] = spawnRain(w, h, false);
         }
+      } else if (current === "snow") {
+        // flakes just drift down; sway is applied at draw time
+        if (p.y - p.r > h) particles[i] = spawnSnow(w, h, false);
       } else {
         // petals / leaves
         p.rot += p.vrot * dt;
@@ -287,6 +306,18 @@
     }
   }
 
+  function drawSnow(ctx, t) {
+    ctx.fillStyle = "#ffffff";
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      var sway = Math.sin(t * p.swayHz * TAU + p.phase) * p.swayA;
+      ctx.globalAlpha = p.alpha;
+      ctx.beginPath();
+      ctx.arc(p.x + sway, p.y, p.r, 0, TAU);
+      ctx.fill();
+    }
+  }
+
   function render(ctx, w, h, t) {
     if (current === "none" || particles.length === 0) return;
     ctx.save();
@@ -294,6 +325,7 @@
     else if (current === "leaves") drawLeaves(ctx, t);
     else if (current === "rain") drawRain(ctx);
     else if (current === "fireflies") drawFireflies(ctx, t);
+    else if (current === "snow") drawSnow(ctx, t);
     ctx.globalAlpha = 1;
     ctx.restore();
   }

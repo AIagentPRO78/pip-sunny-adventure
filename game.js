@@ -121,6 +121,7 @@
   var jumpQueued = false, roarQueued = false, jumpHeld = false;
   var paused = false, settingsOpen = false, tutorialOpen = false, settingsReturn = "start";
   var stepTimer = 0;
+  var allFoundCelebrated = false;   // fire the "found everything" cheer once per run
 
   // ---- level (data-driven; content lives in levels.js) ----
   var LEVELS = window.DINOLevels || [];
@@ -169,6 +170,7 @@
 
     counts = { apple: 0, egg: 0, star: 0 };
     coinCount = 0;
+    allFoundCelebrated = false;
     particles = [];
     rings = [];
     camX = 0; camZoom = 0; shakeT = 0;
@@ -289,6 +291,47 @@
         life: 0.6, max: 0.6, r: 2 + Math.random() * 3,
         color: color, type: type || "spark", g: 520, rot: Math.random() * 6
       });
+    }
+  }
+
+  // light haptic tap on key moments (phones only; respects sound + reduced-motion)
+  function buzz(pattern) {
+    try {
+      if (settings && settings.sound && !reduceMotion && navigator.vibrate) navigator.vibrate(pattern);
+    } catch (e) {}
+  }
+
+  // little dust kick under Pip's back foot while running
+  function footPuff() {
+    if (reduceMotion || !world || !player) return;
+    var theme = world.theme;
+    var dust = theme === "snow" ? "#ffffff" : theme === "beach" ? "#f1d7a4"
+      : theme === "night" ? "#9fb0c8" : "#cdebb0";
+    var fx = player.x + player.w / 2 - player.face * 14;
+    for (var dpi = 0; dpi < 2; dpi++) {
+      particles.push({
+        x: fx + (Math.random() - 0.5) * 8, y: GROUND_Y - 2,
+        vx: -player.face * (18 + Math.random() * 26), vy: -(16 + Math.random() * 26),
+        life: 0.34, max: 0.34, r: 2 + Math.random() * 2,
+        color: dust, type: "spark", g: 160, rot: 0
+      });
+    }
+  }
+
+  // when every collectible in the level is gathered, throw a little party (once)
+  function maybeCelebrateAllFound() {
+    if (allFoundCelebrated) return;
+    var total = levelTotal(currentLevel);
+    var got = counts.apple + counts.egg + counts.star;
+    if (total <= 0 || got < total) return;
+    allFoundCelebrated = true;
+    showToast("You found everything! 🌟");
+    buzz([0, 30, 40, 30]);
+    if (!reduceMotion) {
+      camZoom = 1;
+      var cols = ["#ff5d8f", "#4cc9f0", "#ffce3a", "#86e08a", "#c08fff"];
+      for (var ci = 0; ci < cols.length; ci++)
+        burst(player.x + player.w / 2, player.y, cols[ci], 8, "confetti");
     }
   }
 
@@ -533,7 +576,7 @@
     if (Math.abs(player.vx) > 5 && player.grounded) player.run += dt * 12;
     if (player.grounded && Math.abs(player.vx) > 5) {
       stepTimer -= dt;
-      if (stepTimer <= 0) { A.step(); stepTimer = 0.28; }
+      if (stepTimer <= 0) { A.step(); footPuff(); stepTimer = 0.28; }
     } else { stepTimer = 0; }
     player.squash *= Math.pow(0.0001, dt); // fast decay toward 0
     if (player.mouth > 0) player.mouth = Math.max(0, player.mouth - dt);
@@ -598,7 +641,9 @@
         c.got = true; counts[c.kind]++; A.collect();
         var col = c.kind === "apple" ? "#ff5d5d" : c.kind === "egg" ? "#ffd07a" : "#ffce3a";
         burst(c.x, c.y, col, 10, "spark");
+        buzz(8);
         updateHud();
+        maybeCelebrateAllFound();
       }
     }
 
@@ -785,6 +830,16 @@
     var hillFar = theme ? theme.hillFar : "#c7ecaf";
     var hillMid = theme ? theme.hillMid : "#a6e38c";
 
+    // farthest parallax: a faint distant ridge for depth (drawn behind the rest)
+    ctx.save();
+    ctx.translate(-camX * 0.12, 0);
+    var back0 = camX * 0.12;
+    ctx.globalAlpha = 0.5;
+    for (var bx2 = Math.floor((back0 - 600) / 600) * 600; bx2 < back0 + viewW + 600; bx2 += 600)
+      S.hill(ctx, bx2, GROUND_Y + 70, 600, 96, hillFar);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
     // far parallax: clouds + hills (the sky painter already drew the sun/moon)
     ctx.save();
     ctx.translate(-camX * 0.25, 0);
@@ -824,6 +879,22 @@
       if (pl.x + pl.w < camX - pad || pl.x > camX + viewW + pad) continue;
       if (pl.h > 100) S.ground(ctx, pl.x, pl.y, pl.w, pl.h);
       else S.platform(ctx, pl.x, pl.y, pl.w, pl.h);
+      if (themeId === "snow") {
+        // soft white blanket covering the grassy top so the world reads as snow,
+        // fixed height (works on wide ground and narrow platforms alike) with a
+        // gently rounded upper edge
+        ctx.fillStyle = "#f6fbff";
+        var capTop = pl.y - 5, capBot = pl.y + (pl.h > 100 ? 13 : 7), rr = 6;
+        ctx.beginPath();
+        ctx.moveTo(pl.x, capBot);
+        ctx.lineTo(pl.x, capTop + rr);
+        ctx.quadraticCurveTo(pl.x, capTop, pl.x + rr, capTop);
+        ctx.lineTo(pl.x + pl.w - rr, capTop);
+        ctx.quadraticCurveTo(pl.x + pl.w, capTop, pl.x + pl.w, capTop + rr);
+        ctx.lineTo(pl.x + pl.w, capBot);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
     for (i = 0; i < world.movers.length; i++) {
       var mvp = world.movers[i];
@@ -1282,6 +1353,7 @@
     camZoom = 0; shakeT = 0;
     clearHeld();
     A.win();
+    buzz([0, 40, 60, 80]);
     winTimer = 1.6;
     markComplete(currentLevel);
     var stkBefore = window.DINOStickers ? window.DINOStickers.earnedSet(buildStats()) : null;
