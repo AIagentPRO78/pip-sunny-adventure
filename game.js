@@ -7,6 +7,7 @@
   var A = window.DINOAudio;
   var TH = window.DINOThemes;
   var W = window.DINOWeather;
+  var AMB = window.DINOAmbient;
 
   // ---- constants (stage units) ----
   var STAGE_W = 960, STAGE_H = 540;
@@ -17,6 +18,11 @@
   var ROAR_CD = 0.7, ROAR_R = 220, POUND_V = 1300, DEATH_Y = 660;
   var BASE_W = 58, BASE_H = 68, GROW_STEP = 0.25, GROW_MAX = 3;
   var BOUNCE_V = -1240, DASH_MULT = 1.7, GLIDE_FALL = 130; // power-ups + pads
+  // assist mode (Little Kid Helper) tunables
+  var ASSIST_HITBOX = 1.6, ASSIST_COYOTE = 0.22, ASSIST_GRAV = 0.82, ASSIST_MOVE = 0.9;
+  var assist = false;          // runtime flag set by applySettings()
+  var camZoom = 0;             // transient roar zoom-punch, eases 1 -> 0
+  var coinCount = 0;           // coins collected this run
   var reduceMotion = false;   // real value set by applySettings() at boot
   var osReduceMotion = window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -116,9 +122,10 @@
     var cfg = LEVELS[idx];
 
     counts = { apple: 0, egg: 0, star: 0 };
+    coinCount = 0;
     particles = [];
     rings = [];
-    camX = 0;
+    camX = 0; camZoom = 0; shakeT = 0;
     WORLD_W = cfg.worldW;
     FLAG_X = cfg.flagX;
 
@@ -129,6 +136,8 @@
 
     var bs = cfg.baby;
     var baby = bs ? { x: bs.x, y: bs.y, w: bs.w, h: bs.h, freed: false, hop: 0, face: 1 } : null;
+    var st = cfg.stash;
+    var stash = st ? { x: st.x, y: st.y, n: st.n, found: false, pulse: 0 } : null;
 
     world = {
       theme: cfg.theme || "meadow",
@@ -136,6 +145,9 @@
       movers: cloneObjs(cfg.movers),
       pads: cloneObjs(cfg.pads),
       collectibles: cloneObjs(cfg.collectibles),
+      coins: cloneObjs(cfg.coins || []),
+      secrets: cloneObjs(cfg.secrets || []),
+      stash: stash,
       critters: cloneObjs(cfg.critters),
       blocks: cloneObjs(cfg.blocks),
       foods: [],
@@ -150,7 +162,7 @@
       grounded: false, airJumps: 1, coyote: 0, run: 0, squash: 0,
       mouth: 0, pounding: false, blink: 0, blinkT: 2.4,
       safeX: cfg.startX, safeY: cfg.startY, roarCd: 0, grow: 0,
-      speedT: 0, floatT: 0, sparkleT: 0, ride: null, trail: []
+      speedT: 0, floatT: 0, sparkleT: 0, ride: null, trail: [], cheer: 0
     };
     if (W && TH) W.set(TH.get(world.theme).weather, reduceMotion);
     updateHud();
@@ -240,7 +252,7 @@
     A.roar();
     var cx = player.x + player.w / 2, cy = player.y + player.h / 2;
     rings.push({ x: cx, y: cy, r: 14, max: ROAR_R });
-    if (!reduceMotion) shakeT = 0.22;
+    if (!reduceMotion) { shakeT = 0.22; camZoom = 1; }
     var i;
     for (i = 0; i < world.blocks.length; i++) {
       var b = world.blocks[i];
@@ -295,6 +307,7 @@
   function eatFood(kind) {
     var cx = player.x + player.w / 2, cy = player.y + player.h / 2;
     player.squash = -0.7;
+    player.cheer = 1;
     A.eat(kind);
     if (kind === "chili") {
       player.speedT = 5;
@@ -320,9 +333,25 @@
     if (!bb || bb.freed) return;
     bb.freed = true;
     world.babySaved = true;
+    player.cheer = 1;
     A.bounce();
     burst(bb.x + bb.w / 2, bb.y + 8, "#ff7aa8", 12, "heart");
     showToast("You saved the baby! 🦕");
+  }
+
+  function revealStash(s) {
+    if (s.found) return;
+    s.found = true;
+    A.bounce();
+    burst(s.x, s.y - 10, "#ffd24a", 18, "spark");
+    for (var i = 0; i < s.n; i++) {
+      var ang = -Math.PI / 2 + (i / Math.max(1, s.n - 1) - 0.5) * 1.4;
+      world.coins.push({
+        x: s.x, y: s.y - 14, got: false,
+        vx: Math.cos(ang) * 120, vy: Math.sin(ang) * 220 - 60, fly: 0.7
+      });
+    }
+    showToast("Hidden stash! 🪙");
   }
 
   var toastT1 = null, toastT2 = null;
@@ -349,7 +378,7 @@
     t += dt;
     // input -> velocity (chili gives a speed boost)
     var dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    player.vx = dir * MOVE * (player.speedT > 0 ? DASH_MULT : 1);
+    player.vx = dir * MOVE * (assist ? ASSIST_MOVE : 1) * (player.speedT > 0 ? DASH_MULT : 1);
     if (dir !== 0) player.face = dir;
 
     // re-show the "how to move" hint if the player hasn't walked yet (touch)
@@ -393,7 +422,7 @@
     if (player.ride) { player.x += player.ride.dx; player.y += player.ride.dy; }
 
     // physics
-    player.vy += GRAV * dt;
+    player.vy += GRAV * (assist ? ASSIST_GRAV : 1) * dt;
     if (player.vy > MAX_FALL) player.vy = MAX_FALL;
     // balloon power-up: hold jump to glide gently down
     if (player.floatT > 0 && jumpHeld && player.vy > GLIDE_FALL) player.vy = GLIDE_FALL;
@@ -446,7 +475,7 @@
 
     if (player.grounded) {
       player.airJumps = 1;
-      player.coyote = 0.1;
+      player.coyote = assist ? ASSIST_COYOTE : 0.1;
       player.safeX = player.x; player.safeY = player.y;
       if (player.pounding) { player.pounding = false; if (player.roarCd <= 0) doRoar(); }
       if (!wasGrounded) player.squash = 0.7;
@@ -466,6 +495,7 @@
     player.blinkT -= dt;
     if (player.blinkT <= 0) { player.blink = 0.12; player.blinkT = 2 + Math.random() * 2.5; }
     if (player.blink > 0) player.blink -= dt;
+    if (player.cheer > 0) player.cheer = Math.max(0, player.cheer - dt / 0.45);
 
     // power-up timers + their sparkle/flame trails
     if (player.speedT > 0) {
@@ -518,12 +548,49 @@
           c.y += (pcy - c.y) * Math.min(1, dt * 6);
         }
       }
-      if (Math.hypot(c.x - pcx, c.y - pcy) < 34) {
+      if (Math.hypot(c.x - pcx, c.y - pcy) < 34 * (assist ? ASSIST_HITBOX : 1)) {
         c.got = true; counts[c.kind]++; A.collect();
         var col = c.kind === "apple" ? "#ff5d5d" : c.kind === "egg" ? "#ffd07a" : "#ffce3a";
         burst(c.x, c.y, col, 10, "spark");
         updateHud();
       }
+    }
+
+    // coins (gold currency; magnet-able; flung stash coins arc then settle)
+    for (i = 0; i < world.coins.length; i++) {
+      var cn = world.coins[i];
+      if (cn.got) continue;
+      if (cn.fly > 0) {
+        cn.fly -= dt; cn.vy += 900 * dt;
+        cn.x += cn.vx * dt; cn.y += cn.vy * dt;
+        if (cn.y > GROUND_Y - 30) { cn.y = GROUND_Y - 30; cn.fly = 0; }
+      }
+      if (player.sparkleT > 0) {
+        var dco = Math.hypot(cn.x - pcx, cn.y - pcy);
+        if (dco < 170 && dco > 1) { cn.x += (pcx - cn.x) * Math.min(1, dt * 6); cn.y += (pcy - cn.y) * Math.min(1, dt * 6); }
+      }
+      if (Math.hypot(cn.x - pcx, cn.y - pcy) < 34 * (assist ? ASSIST_HITBOX : 1)) {
+        cn.got = true; coinCount++; addCoins(1); A.collect();
+        burst(cn.x, cn.y, "#ffd24a", 8, "spark"); updateHud();
+      }
+    }
+    // secret collectibles (ghostly until found; a few coins each)
+    for (i = 0; i < world.secrets.length; i++) {
+      var se = world.secrets[i];
+      if (se.got) continue;
+      if (Math.hypot(se.x - pcx, se.y - pcy) < 36 * (assist ? ASSIST_HITBOX : 1)) {
+        se.got = true; coinCount += 3; addCoins(3); A.checkpoint();
+        burst(se.x, se.y, "#ffe27a", 14, "spark"); burst(se.x, se.y, "#ff7aa8", 4, "heart");
+        showToast("Secret found! ✨"); updateHud();
+      }
+    }
+    // hidden stash: stand on it (grounded, close) or it warms up; reveal -> coin burst
+    var stsh = world.stash;
+    if (stsh && !stsh.found) {
+      var nearStash = Math.abs(pcx - stsh.x) < 40 && player.grounded &&
+        Math.abs((player.y + player.h) - stsh.y) < 50;
+      stsh.pulse = nearStash ? Math.min(1, stsh.pulse + dt * 1.2) : Math.max(0, stsh.pulse - dt * 2);
+      if (stsh.pulse >= 1) revealStash(stsh);
     }
 
     // foods: pop out of boxes, settle, then can be eaten for a power-up
@@ -535,7 +602,7 @@
         st.y += st.vy * dt;
         if (st.vy > 0 && st.y >= st.restY) { st.y = st.restY; st.vy = 0; st.settled = true; }
       }
-      if (Math.hypot(st.x - pcx, st.y - pcy) < 34 + player.grow * 6) {
+      if (Math.hypot(st.x - pcx, st.y - pcy) < (34 + player.grow * 6) * (assist ? ASSIST_HITBOX : 1)) {
         st.got = true;
         eatFood(st.kind);
       }
@@ -581,8 +648,8 @@
     var baby = world.baby;
     if (baby) {
       if (!baby.freed) {
-        if (Math.abs(pcx - (baby.x + baby.w / 2)) < 42 &&
-          Math.abs(pcy - (baby.y + baby.h / 2)) < 66) freeBaby();
+        if (Math.abs(pcx - (baby.x + baby.w / 2)) < 42 * (assist ? ASSIST_HITBOX : 1) &&
+          Math.abs(pcy - (baby.y + baby.h / 2)) < 66 * (assist ? ASSIST_HITBOX : 1)) freeBaby();
       } else {
         var tp = player.trail.length > 22 ? player.trail[player.trail.length - 22] : null;
         if (tp) {
@@ -614,6 +681,7 @@
     }
 
     if (shakeT > 0) shakeT -= dt;
+    if (camZoom > 0) camZoom = Math.max(0, camZoom - dt / 0.25);
 
     // checkpoints: passing one (while grounded) raises its flag + moves respawn
     var pmid = player.x + player.w / 2;
@@ -651,9 +719,19 @@
     var themeId = world ? world.theme : "meadow";
     if (TH) TH.drawSky(ctx, cssW, cssH, themeId, t);
     else S.sky(ctx, cssW, cssH);
+    if (AMB) AMB.render(ctx, cssW, cssH, t, themeId);   // sky creatures (screen space)
+    if (mode === "select" && window.DINOSeasons) {       // seasonal ambience on the map
+      window.DINOSeasons.drawOverlay(ctx, cssW, cssH, window.DINOSeasons.current(), t);
+    }
     ctx.save();
     var sx = (shakeT > 0 && !reduceMotion) ? Math.sin(t * 60) * 6 * shakeT : 0;
+    var z = camZoom > 0 ? Math.sin(camZoom * Math.PI) * 0.06 : 0;
     ctx.translate(sx, 0);
+    if (z !== 0) {
+      ctx.translate(cssW / 2, cssH / 2);
+      ctx.scale(1 + z, 1 + z);
+      ctx.translate(-cssW / 2, -cssH / 2);
+    }
     ctx.scale(scale, scale);
     if (!world) { ctx.restore(); return; }
     var i, pad = 140;
@@ -728,6 +806,30 @@
       if (c.kind === "apple") S.apple(ctx, c.x, c.y, t);
       else if (c.kind === "egg") S.egg(ctx, c.x, c.y, t);
       else S.star(ctx, c.x, c.y, t);
+      if (settings.colorblind) drawKindGlyph(ctx, c.kind, c.x, c.y, t);
+      if (window.DINOLearn && settings.learn !== "off") window.DINOLearn.draw(ctx, c.x, c.y, settings.learn, i, t);
+    }
+    // coins
+    for (i = 0; i < world.coins.length; i++) {
+      var cny = world.coins[i];
+      if (cny.got || !vis(cny.x, pad)) continue;
+      S.coin(ctx, cny.x, cny.y, t);
+    }
+    // secret collectibles (drawn faintly until found)
+    for (i = 0; i < world.secrets.length; i++) {
+      var sse = world.secrets[i];
+      if (sse.got || !vis(sse.x, pad)) continue;
+      ctx.globalAlpha = 0.5;
+      if (sse.kind === "apple") S.apple(ctx, sse.x, sse.y, t);
+      else if (sse.kind === "egg") S.egg(ctx, sse.x, sse.y, t);
+      else S.star(ctx, sse.x, sse.y, t);
+      ctx.globalAlpha = 1;
+    }
+    // hidden stash glint (brightens as Pip nears)
+    if (world.stash && !world.stash.found && vis(world.stash.x, pad)) {
+      ctx.globalAlpha = 0.25 + world.stash.pulse * 0.6;
+      S.coin(ctx, world.stash.x, world.stash.y - 8, t);
+      ctx.globalAlpha = 1;
     }
     for (i = 0; i < world.foods.length; i++) {
       var fd = world.foods[i];
@@ -772,9 +874,24 @@
       mouth: player.mouth > 0 ? Math.min(1, player.mouth / 0.3) : 0,
       run: player.run,
       moving: Math.abs(player.vx) > 5 && player.grounded,
-      blink: player.blink > 0
+      blink: player.blink > 0,
+      idle: (!reduceMotion && player.grounded && Math.abs(player.vx) < 5) ? t : 0,
+      cheer: player.cheer
     });
     if (window.DINOCosmetics) window.DINOCosmetics.drawOn(ctx, player, { face: player.face });
+  }
+
+  // non-color differentiator letter on collectibles when colorblind help is on
+  var KIND_GLYPH = { apple: "A", egg: "E", star: "S" };
+  function drawKindGlyph(ctx2, kind, x, y, time) {
+    var bob = Math.sin(time * 3 + x) * (kind === "star" ? 4 : 3);
+    ctx2.save();
+    ctx2.font = "900 13px Trebuchet MS, system-ui, sans-serif";
+    ctx2.textAlign = "center"; ctx2.textBaseline = "middle";
+    ctx2.lineWidth = 3; ctx2.strokeStyle = "rgba(43,36,64,0.85)"; ctx2.fillStyle = "#fff";
+    var gy = y + bob + 1, g = KIND_GLYPH[kind] || "?";
+    ctx2.strokeText(g, x, gy); ctx2.fillText(g, x, gy);
+    ctx2.restore();
   }
 
   // ---- HUD / screens ----
@@ -782,6 +899,8 @@
     document.getElementById("nApple").textContent = counts.apple;
     document.getElementById("nEgg").textContent = counts.egg;
     document.getElementById("nStar").textContent = counts.star;
+    var nc = document.getElementById("nCoin");
+    if (nc) nc.textContent = coinCount;
   }
 
   function show(id, on) { document.getElementById(id).classList.toggle("hidden", !on); }
@@ -825,27 +944,45 @@
 
   // ---- settings (localStorage; graceful degrade) ----
   var SETTINGS_KEY = "pip_settings";
-  var settings = { music: true, sound: true, reduceMotion: false };
+  function freshSettings() {
+    return { music: true, sound: true, reduceMotion: false, colorblind: false, iconOnly: false, assist: false, learn: "off" };
+  }
+  var settings = freshSettings();
   function loadSettings() {
     try {
       var raw = localStorage.getItem(SETTINGS_KEY);
       var s = raw ? JSON.parse(raw) : null;
-      if (!s || typeof s !== "object") return { music: true, sound: true, reduceMotion: false };
-      return { music: s.music !== false, sound: s.sound !== false, reduceMotion: s.reduceMotion === true };
-    } catch (e) { return { music: true, sound: true, reduceMotion: false }; }
+      if (!s || typeof s !== "object") return freshSettings();
+      var learnOk = window.DINOLearn && window.DINOLearn.modes && window.DINOLearn.modes.indexOf(s.learn) >= 0;
+      return {
+        music: s.music !== false, sound: s.sound !== false, reduceMotion: s.reduceMotion === true,
+        colorblind: s.colorblind === true, iconOnly: s.iconOnly === true, assist: s.assist === true,
+        learn: learnOk ? s.learn : "off"
+      };
+    } catch (e) { return freshSettings(); }
   }
   function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
   function applySettings() {
     if (A.setMusicMuted) A.setMusicMuted(!settings.music);
     if (A.setSfxMuted) A.setSfxMuted(!settings.sound);
     reduceMotion = osReduceMotion || settings.reduceMotion;
+    assist = settings.assist;
     document.body.classList.toggle("reduce-motion", reduceMotion);
+    document.body.classList.toggle("colorblind", settings.colorblind);
+    document.body.classList.toggle("icon-only", settings.iconOnly);
+    if (window.DINOLearn && window.DINOLearn.setMode) window.DINOLearn.setMode(settings.learn);
   }
+  var LEARN_LABELS = { off: "Off", count: "123", letters: "ABC", shapes: "Shapes" };
   function setSwitch(id, on) { var el = document.getElementById(id); if (el) el.setAttribute("aria-checked", on ? "true" : "false"); }
   function syncToggleUI() {
     setSwitch("optMusic", settings.music);
     setSwitch("optSound", settings.sound);
     setSwitch("optMotion", settings.reduceMotion);
+    setSwitch("optColorblind", settings.colorblind);
+    setSwitch("optIconOnly", settings.iconOnly);
+    setSwitch("optAssist", settings.assist);
+    var lv = document.getElementById("optLearnValue");
+    if (lv) lv.textContent = LEARN_LABELS[settings.learn] || "Off";
   }
   function openSettings(from) { settingsReturn = from || "start"; settingsOpen = true; syncToggleUI(); show("settings", true); }
   function closeSettings() {
@@ -875,6 +1012,29 @@
     for (var k in s) if (s.hasOwnProperty(k) && typeof s[k] === "number") sum += s[k];
     return sum;
   }
+
+  // ---- v4 persistence: coins / babies-rescued / collectibles-found ----
+  var COINS_KEY = "pip_coins", BABIES_KEY = "pip_babies", FOUND_KEY = "pip_found";
+  function loadCoins() { try { var v = parseInt(localStorage.getItem(COINS_KEY), 10); return isFinite(v) && v >= 0 ? v : 0; } catch (e) { return 0; } }
+  function addCoins(n) { var total = loadCoins() + n; try { localStorage.setItem(COINS_KEY, String(total)); } catch (e) {} return total; }
+  function totalCoins() { return loadCoins(); }
+  function loadBabies() { try { var b = JSON.parse(localStorage.getItem(BABIES_KEY)); return (b && typeof b === "object") ? b : {}; } catch (e) { return {}; } }
+  function saveBabies(b) { try { localStorage.setItem(BABIES_KEY, JSON.stringify(b)); } catch (e) {} }
+  function loadFound() { try { var f = JSON.parse(localStorage.getItem(FOUND_KEY)); return (f && typeof f === "object") ? f : {}; } catch (e) { return {}; } }
+  function saveFound(o) { try { localStorage.setItem(FOUND_KEY, JSON.stringify(o)); } catch (e) {} }
+  function bestFound(idx) { var v = loadFound()[idx]; return (typeof v === "number" && v >= 0) ? v : 0; }
+  function recordFound(idx, n) { var f = loadFound(); if (!(f[idx] >= n)) { f[idx] = n; saveFound(f); } return f[idx] || 0; }
+  function levelTotal(idx) { var c = LEVELS[idx]; return (c && c.collectibles) ? c.collectibles.length : 0; }
+  // shared stats object that achievements + stickers read
+  function buildStats() {
+    var prog = loadProgress();
+    return {
+      done: Array.isArray(prog.done) ? prog.done.slice() : [],
+      stars: loadStars(), totalStars: totalStars(),
+      babies: loadBabies(), coins: loadCoins(), found: loadFound(),
+      levelsCount: LEVELS.length
+    };
+  }
   function computeStars() {
     var cfg = LEVELS[currentLevel];
     var total = (cfg && cfg.collectibles) ? cfg.collectibles.length : 0;
@@ -897,7 +1057,7 @@
     if (mode !== "play" || tutorialOpen) return;
     if (on === paused) return;
     paused = on;
-    if (paused) { clearHeld(); show("pauseOverlay", true); }
+    if (paused) { clearHeld(); camZoom = 0; show("pauseOverlay", true); }
     else { show("pauseOverlay", false); last = 0; }
   }
   function togglePause() { setPaused(!paused); }
@@ -932,19 +1092,20 @@
     var row = document.getElementById("closetRow");
     if (!row) return;
     var stars = totalStars();
+    var coins = totalCoins();
     var sl = document.getElementById("closetStars");
-    if (sl) sl.textContent = stars + " ★";
+    if (sl) sl.textContent = stars + " ★  ·  " + coins + " ◉";
     var equipped = window.DINOCosmetics.getEquipped();
     row.innerHTML = "";
     var items = window.DINOCosmetics.items;
     for (var i = 0; i < items.length; i++) {
       (function (item) {
-        var unlocked = window.DINOCosmetics.isUnlocked(item.id, stars);
+        var unlocked = window.DINOCosmetics.isUnlocked(item.id, stars, coins);
         var b = document.createElement("button");
         b.type = "button";
         b.className = "swatch" + (item.id === equipped ? " is-equipped" : "") + (unlocked ? "" : " is-locked");
         b.setAttribute("role", "listitem");
-        b.setAttribute("aria-label", item.name + (unlocked ? (item.id === equipped ? " (equipped)" : "") : " (locked: " + item.cost + " stars)"));
+        b.setAttribute("aria-label", item.name + (unlocked ? (item.id === equipped ? " (equipped)" : "") : " (locked: " + item.cost + " stars or " + (item.cost * 5) + " coins)"));
         b.disabled = !unlocked;
         var cv = document.createElement("canvas");
         cv.width = 56; cv.height = 56;
@@ -962,11 +1123,11 @@
         var nm = document.createElement("span");
         nm.textContent = item.name; b.appendChild(nm);
         if (!unlocked) {
-          var cost = document.createElement("span"); cost.className = "cost"; cost.textContent = item.cost + "★"; b.appendChild(cost);
+          var cost = document.createElement("span"); cost.className = "cost"; cost.textContent = item.cost + "★/" + (item.cost * 5) + "◉"; b.appendChild(cost);
           var lk = document.createElement("span"); lk.className = "lock"; lk.textContent = "🔒"; b.appendChild(lk);
         }
         b.addEventListener("click", function () {
-          if (!window.DINOCosmetics.isUnlocked(item.id, totalStars())) return;
+          if (!window.DINOCosmetics.isUnlocked(item.id, totalStars(), totalCoins())) return;
           window.DINOCosmetics.setEquipped(item.id);
           renderCloset();
         });
@@ -992,6 +1153,14 @@
         nodes[n].appendChild(sr);
       }
       sr.innerHTML = starHTML(bestStars(idx));
+      var fr = nodes[n].querySelector(".node-found");
+      if (!fr) {
+        fr = document.createElement("span");
+        fr.className = "node-found";
+        fr.setAttribute("aria-hidden", "true");
+        nodes[n].appendChild(fr);
+      }
+      fr.textContent = bestFound(idx) + "/" + levelTotal(idx);
     }
   }
   function showLevelSelect() {
@@ -1006,6 +1175,13 @@
     show("muteBtn", false);
     show("pauseBtn", false);
     show("pauseOverlay", false);
+    show("achievements", false);
+    show("album", false);
+    if (window.DINOSeasons) {
+      var sel = document.getElementById("levelSelect");
+      sel.classList.remove("season-spring", "season-summer", "season-autumn", "season-winter", "season-holiday");
+      sel.classList.add(window.DINOSeasons.get(window.DINOSeasons.current()).cssClass);
+    }
     refreshLevelNodes();
     renderCloset();
     show("levelSelect", true);
@@ -1036,12 +1212,32 @@
     if (mode === "win") return;
     mode = "win";
     paused = false;
+    camZoom = 0; shakeT = 0;
     clearHeld();
     A.win();
     winTimer = 1.6;
     markComplete(currentLevel);
+    var stkBefore = window.DINOStickers ? window.DINOStickers.earnedSet(buildStats()) : null;
     var earned = computeStars();
     recordStars(currentLevel, earned);
+    if (world.babySaved) { var bbm = loadBabies(); bbm[currentLevel] = true; saveBabies(bbm); }
+    var gotN = counts.apple + counts.egg + counts.star;
+    recordFound(currentLevel, gotN);
+    var wf = document.getElementById("wFound");
+    if (wf) wf.textContent = "Found " + gotN + "/" + levelTotal(currentLevel);
+    var stats = buildStats();
+    if (window.DINOAchievements) {
+      var newBadges = window.DINOAchievements.checkAll(stats);
+      for (var bi = 0; bi < newBadges.length; bi++) (function (bd, d) {
+        setTimeout(function () { showToast("Badge! " + (bd.emoji || "🏅") + " " + bd.name); }, d);
+      })(newBadges[bi], 1900 + bi * 1700);
+    }
+    if (window.DINOStickers && stkBefore) {
+      var afterSt = window.DINOStickers.earnedSet(stats), slist = window.DINOStickers.stickers;
+      for (var si = 0; si < slist.length; si++) {
+        if (afterSt[slist[si].id] && !stkBefore[slist[si].id]) { showToast("New sticker: " + slist[si].name + " ⭐"); break; }
+      }
+    }
     var winStars = document.getElementById("winStars");
     if (winStars) {
       winStars.innerHTML = starHTML(earned);
@@ -1093,6 +1289,58 @@
   });
   document.getElementById("mapBtn").addEventListener("click", showLevelSelect);
 
+  // ---- badges + sticker album screens ----
+  function renderBadges() {
+    var grid = document.getElementById("badgeGrid");
+    if (!grid || !window.DINOAchievements) return;
+    grid.innerHTML = "";
+    var list = window.DINOAchievements.badges, dpr = Math.min(2, window.devicePixelRatio || 1), size = 78;
+    for (var i = 0; i < list.length; i++) {
+      var badge = list[i], earned = window.DINOAchievements.isEarned(badge.id);
+      var cell = document.createElement("div");
+      cell.className = "badge-cell" + (earned ? "" : " is-locked");
+      cell.setAttribute("role", "listitem");
+      var cv = document.createElement("canvas");
+      cv.width = size * dpr; cv.height = size * dpr; cv.style.width = size + "px"; cv.style.height = size + "px";
+      cv.setAttribute("aria-label", badge.name + (earned ? ", earned" : ", locked"));
+      var cx2 = cv.getContext("2d"); cx2.scale(dpr, dpr);
+      window.DINOAchievements.drawBadge(cx2, size / 2, size / 2, size, badge, earned);
+      cell.appendChild(cv);
+      var nm = document.createElement("span"); nm.className = "badge-name"; nm.textContent = earned ? badge.name : "???"; cell.appendChild(nm);
+      grid.appendChild(cell);
+    }
+  }
+  function refreshAlbum() {
+    var grid = document.getElementById("albumGrid");
+    if (!grid || !window.DINOStickers) return;
+    var stats = buildStats(), earned = window.DINOStickers.earnedSet(stats), list = window.DINOStickers.stickers;
+    var dpr = Math.min(2, window.devicePixelRatio || 1), size = 78, got = 0;
+    grid.innerHTML = "";
+    for (var i = 0; i < list.length; i++) {
+      var stk = list[i], on = !!earned[stk.id];
+      if (on) got++;
+      var cell = document.createElement("div");
+      cell.className = "album-cell" + (on ? "" : " locked");
+      cell.setAttribute("role", "listitem");
+      var cv = document.createElement("canvas");
+      cv.width = size * dpr; cv.height = size * dpr; cv.style.width = size + "px"; cv.style.height = size + "px";
+      cv.setAttribute("aria-label", stk.name + (on ? "" : " (locked)"));
+      var cx2 = cv.getContext("2d"); cx2.scale(dpr, dpr);
+      window.DINOStickers.drawSticker(cx2, size / 2, size / 2, size, stk, on);
+      cell.appendChild(cv);
+      var nm = document.createElement("span"); nm.className = "label"; nm.textContent = on ? stk.name : "???"; cell.appendChild(nm);
+      grid.appendChild(cell);
+    }
+    var ac = document.getElementById("albumCount");
+    if (ac) ac.textContent = got + " of " + list.length + " stickers";
+  }
+  function showAchievements() { if (!window.DINOAchievements) return; renderBadges(); show("levelSelect", false); show("achievements", true); }
+  function showAlbum() { if (!window.DINOStickers) return; refreshAlbum(); show("levelSelect", false); show("album", true); }
+  document.getElementById("achBtnOpen").addEventListener("click", showAchievements);
+  document.getElementById("albumBtnOpen").addEventListener("click", showAlbum);
+  document.getElementById("achBackBtn").addEventListener("click", function () { show("achievements", false); showLevelSelect(); });
+  document.getElementById("albumBackBtn").addEventListener("click", function () { show("album", false); showLevelSelect(); });
+
   var muteBtn = document.getElementById("muteBtn");
   muteBtn.addEventListener("click", function () {
     var m = !A.isMuted();
@@ -1111,6 +1359,14 @@
   document.getElementById("optMusic").addEventListener("click", function () { toggleSetting("music"); });
   document.getElementById("optSound").addEventListener("click", function () { toggleSetting("sound"); });
   document.getElementById("optMotion").addEventListener("click", function () { toggleSetting("reduceMotion"); });
+  document.getElementById("optColorblind").addEventListener("click", function () { toggleSetting("colorblind"); });
+  document.getElementById("optIconOnly").addEventListener("click", function () { toggleSetting("iconOnly"); });
+  document.getElementById("optAssist").addEventListener("click", function () { toggleSetting("assist"); });
+  document.getElementById("optLearn").addEventListener("click", function () {
+    var modes = (window.DINOLearn && window.DINOLearn.modes) || ["off", "count", "letters", "shapes"];
+    settings.learn = modes[(modes.indexOf(settings.learn) + 1) % modes.length];
+    saveSettings(); applySettings(); syncToggleUI();
+  });
   document.getElementById("tutorialOkBtn").addEventListener("click", dismissTutorial);
 
   document.getElementById("rotateDismiss").addEventListener("click", function () {
@@ -1134,6 +1390,7 @@
     if (mode === "play" && !paused) update(dt);
     else t += dt;
     if (W) W.update(dt, cssW, cssH);   // weather animates on every screen
+    if (AMB) AMB.update(dt, cssW, cssH, world ? world.theme : "meadow");
 
     if (mode === "win" && winTimer > 0) {
       winTimer -= dt;
@@ -1173,7 +1430,10 @@
     isComplete: isComplete,
     totalStars: totalStars,
     bestStars: bestStars,
-    resetProgress: function () { saveProgress({ done: [] }); saveStars({}); },
+    resetProgress: function () {
+      saveProgress({ done: [] }); saveStars({});
+      try { localStorage.removeItem(COINS_KEY); localStorage.removeItem(BABIES_KEY); localStorage.removeItem(FOUND_KEY); localStorage.removeItem("pip_badges"); } catch (e) {}
+    },
     warp: function (x, y) { if (player) { player.x = x; if (y != null) player.y = y; player.vx = 0; player.vy = 0; } }
   };
 

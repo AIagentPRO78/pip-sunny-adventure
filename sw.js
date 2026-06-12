@@ -4,7 +4,7 @@
    cached assets (and the cached index.html shell) when offline. */
 "use strict";
 
-var CACHE = "pip-v3-net2";
+var CACHE = "pip-v4-net";
 
 var CORE = [
   "./",
@@ -17,6 +17,11 @@ var CORE = [
   "levels.js",
   "decor.js",
   "cosmetics.js",
+  "ambient.js",
+  "seasons.js",
+  "learn.js",
+  "achievements.js",
+  "stickers.js",
   "game.js",
   "manifest.webmanifest",
   "icon-192.png",

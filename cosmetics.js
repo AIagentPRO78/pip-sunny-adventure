@@ -44,9 +44,10 @@
     return BY_ID[id] || BY_ID.none;
   }
 
-  function isUnlocked(id, totalStars) {
+  function isUnlocked(id, totalStars, totalCoins) {
     var item = get(id);
-    return item.cost <= (totalStars || 0);
+    if (item.cost <= (totalStars || 0)) return true;
+    return (totalCoins || 0) >= item.cost * 5;   // 5 coins == 1 star
   }
 
   /* ---------- equipped persistence (degrades gracefully) ---------- */

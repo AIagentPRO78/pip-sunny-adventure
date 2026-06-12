@@ -22,6 +22,7 @@
       <div class="tally"><span class="ico apple"></span><span id="nApple">0</span></div>
       <div class="tally"><span class="ico egg"></span><span id="nEgg">0</span></div>
       <div class="tally"><span class="ico star"></span><span id="nStar">0</span></div>
+      <div class="tally"><span class="ico coin"></span><span id="nCoin">0</span></div>
     </div>
 
     <button id="pauseBtn" class="corner-btn hidden" aria-label="Pause game">⏸</button>
@@ -90,7 +91,30 @@
           <h3 class="closet-title">Pip's Closet <span id="closetStars" class="closet-stars">0 ★</span></h3>
           <div id="closetRow" class="closet-row" role="list"></div>
         </div>
+        <div class="map-nav">
+          <button id="achBtnOpen" class="small-btn" aria-label="Badges">🏅 Badges</button>
+          <button id="albumBtnOpen" class="small-btn" aria-label="Sticker album">📒 Album</button>
+        </div>
         <button id="mapBackBtn" class="small-btn">⌂ Home</button>
+      </div>
+    </div>
+
+    <!-- Badges -->
+    <div id="achievements" class="screen hidden" role="dialog" aria-modal="true" aria-label="Badges">
+      <div class="card grid-card">
+        <h1>Pip's Badges</h1>
+        <div id="badgeGrid" class="badge-grid" role="list"></div>
+        <button id="achBackBtn" class="small-btn">‹ Back</button>
+      </div>
+    </div>
+
+    <!-- Sticker album -->
+    <div id="album" class="screen hidden" role="dialog" aria-modal="true" aria-label="Sticker album">
+      <div class="card grid-card">
+        <h1>Sticker Album</h1>
+        <p class="sub" id="albumCount"></p>
+        <div id="albumGrid" class="album-grid" role="list"></div>
+        <button id="albumBackBtn" class="small-btn">‹ Back</button>
       </div>
     </div>
 
@@ -106,6 +130,7 @@
           <div class="res"><span class="ico star"></span><span id="wStar">0</span></div>
         </div>
         <p class="baby-line" id="wBaby"></p>
+        <p class="found-line" id="wFound"></p>
         <div class="win-actions">
           <button id="nextBtn" class="big-btn">▶ NEXT LEVEL</button>
           <button id="mapBtn" class="small-btn">🗺️ Map</button>
@@ -142,6 +167,22 @@
           <button class="toggle-row" id="optMotion" role="switch" aria-checked="false">
             <span class="toggle-label">🌿 Reduced Motion</span>
             <span class="toggle-pill" aria-hidden="true"><span class="toggle-knob"></span></span>
+          </button>
+          <button class="toggle-row" id="optColorblind" role="switch" aria-checked="false">
+            <span class="toggle-label">👓 Colorblind Help</span>
+            <span class="toggle-pill" aria-hidden="true"><span class="toggle-knob"></span></span>
+          </button>
+          <button class="toggle-row" id="optIconOnly" role="switch" aria-checked="false">
+            <span class="toggle-label">🧒 Picture Mode</span>
+            <span class="toggle-pill" aria-hidden="true"><span class="toggle-knob"></span></span>
+          </button>
+          <button class="toggle-row" id="optAssist" role="switch" aria-checked="false">
+            <span class="toggle-label">🤝 Helper Mode</span>
+            <span class="toggle-pill" aria-hidden="true"><span class="toggle-knob"></span></span>
+          </button>
+          <button class="toggle-row select-row" id="optLearn" aria-label="Learning labels">
+            <span class="toggle-label">🎓 Learn</span>
+            <span class="select-value" id="optLearnValue">Off</span>
           </button>
         </div>
         <div class="actions"><button id="settingsBackBtn" class="small-btn">‹ Back</button></div>
@@ -183,7 +224,12 @@
   <script src="weather.js"></script>
   <script src="decor.js"></script>
   <script src="cosmetics.js"></script>
+  <script src="ambient.js"></script>
+  <script src="seasons.js"></script>
+  <script src="learn.js"></script>
   <script src="levels.js"></script>
+  <script src="achievements.js"></script>
+  <script src="stickers.js"></script>
   <script src="game.js"></script>
   <script>
     if ("serviceWorker" in navigator) {

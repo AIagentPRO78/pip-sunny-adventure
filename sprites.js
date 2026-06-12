@@ -343,9 +343,13 @@
     var mouth = opts.mouth || 0;
     var run = opts.run || 0;
     var moving = opts.moving;
+    var idle = (!moving && !opts.blink) ? (opts.idle || 0) : 0;   // breathing phase when standing
+    var cheer = opts.cheer || 0;                                  // 0..1 happy reaction
+    var breath = idle ? Math.sin(idle * 2.2) * 0.02 : 0;
+    var cheerPop = cheer > 0 ? Math.sin(cheer * Math.PI) * 0.12 : 0;
 
-    var bodyW = p.w * (1 + sq * 0.16);
-    var bodyH = p.h * (1 - sq * 0.14);
+    var bodyW = p.w * (1 + sq * 0.16 + cheerPop * 0.6);
+    var bodyH = p.h * (1 - sq * 0.14 + breath + cheerPop);
     var by = feet - bodyH;
 
     var green = "#7fd06f", greenD = "#4ea744", greenM = "#69c259", belly = "#eaf8d0";
@@ -355,7 +359,7 @@
     ctx.scale(face, 1);
     ctx.translate(-cx, -feet);
 
-    var sw = moving ? Math.sin(run) * 6 : 0;
+    var sw = moving ? Math.sin(run) * 6 : (idle ? Math.sin(idle * 1.6) * 3 : 0);
 
     // ---- tail (thick, tapering, behind) ----
     ctx.fillStyle = greenD;
@@ -482,6 +486,18 @@
     ctx.moveTo(hx + hr * 0.06, hy - hr * 0.62);
     ctx.lineTo(hx + hr * 0.62, hy - hr * 0.5);
     ctx.stroke();
+
+    // ---- happy cheer sparkles (power-up / rescue reaction) ----
+    if (cheer > 0) {
+      var ce = Math.sin(cheer * Math.PI);
+      ctx.globalAlpha = ce;
+      var ex = hx + hr * 0.3, ey = hy - hr * 0.95 - (1 - cheer) * 10;
+      star(ctx, ex, ey, idle || run);
+      ctx.fillStyle = "#ff7aa8";
+      circle(ctx, ex + 11, ey + 5, 2.4 * ce); ctx.fill();
+      circle(ctx, ex - 12, ey + 7, 2 * ce); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
 
     ctx.restore();
   }
@@ -668,12 +684,48 @@
     ctx.fill();
   }
 
+  /* ---------- gold coin (spins via t) ---------- */
+  function coin(ctx, x, y, t) {
+    var bob = Math.sin(t * 3 + x) * 3;
+    var spin = Math.cos(t * 4 + x * 0.05);
+    var rx = Math.max(2.5, Math.abs(spin) * 12);
+    var edge = spin < 0;
+    ctx.save();
+    ctx.translate(x, y + bob);
+    ctx.fillStyle = "#b8860b";
+    ctx.beginPath(); ctx.ellipse(0, 1.5, rx + 1.5, 13.5, 0, 0, Math.PI * 2); ctx.fill();
+    var g = ctx.createLinearGradient(-rx, -12, rx, 12);
+    g.addColorStop(0, edge ? "#d9a521" : "#ffe27a");
+    g.addColorStop(1, edge ? "#a9781a" : "#f4b400");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 0, rx, 12, 0, 0, Math.PI * 2); ctx.fill();
+    if (rx > 6) {
+      ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.beginPath(); ctx.ellipse(0, 0, rx - 2.5, 9, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.save();
+      ctx.scale(rx / 12, 1);
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      var sp = 5, o = 5, inr = 2.1;
+      ctx.beginPath();
+      for (var i = 0; i < sp * 2; i++) {
+        var rad = i % 2 === 0 ? o : inr;
+        var a = (Math.PI / sp) * i - Math.PI / 2;
+        ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    circle(ctx, -rx * 0.4, -5, 1.8); ctx.fill();
+    ctx.restore();
+  }
+
   window.DINOSprites = {
     sky: sky, sun: sun, cloud: cloud, hill: hill, tree: tree, bush: bush,
     ground: ground, platform: platform, apple: apple, egg: egg, star: star,
     steak: steak, block: block, butterfly: butterfly, critter: critter, flag: flag,
     dino: dino, particle: particle, ring: ring,
     chili: chili, balloon: balloon, lolly: lolly, bouncePad: bouncePad,
-    cage: cage, babyDino: babyDino, checkFlag: checkFlag
+    cage: cage, babyDino: babyDino, checkFlag: checkFlag, coin: coin
   };
 })();

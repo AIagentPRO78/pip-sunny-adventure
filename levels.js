@@ -22,6 +22,9 @@
     return { x: x, y: y, w: w, h: 24, x0: x, y0: y, ax: 0, ay: ay, sp: sp, ph: ph || 0, dx: 0, dy: 0 };
   }
   function cage(x) { return { x: x, y: GROUND_Y - 42, w: 42, h: 42, freed: false, hop: 0, face: 1 }; }
+  function coin(x, y) { return { x: x, y: y, got: false }; }
+  function secret(x, y, k) { return { x: x, y: y, kind: k || "star", got: false }; }
+  function stash(x, y, n) { return { x: x, y: y, n: n || 6, found: false, pulse: 0 }; }
 
   var LEVELS = [
     // ===== LEVEL 1 — Sunny Meadow (day) =====
@@ -57,6 +60,14 @@
       pads: [pad(1030, 444), pad(3700, 314)],
       movers: [moverH(2630, 330, 150, 150, 1.0, 0), moverV(4900, 360, 130, 72, 1.1, 1.5)],
       baby: cage(3980),
+      coins: [
+        coin(460, 415), coin(660, 415), coin(770, 280),
+        coin(1035, 150), coin(1600, 295), coin(2350, 290),
+        coin(3700, 295), coin(4180, 295), coin(4900, 300),
+        coin(5180, 175), coin(5560, 415)
+      ],
+      secrets: [secret(1180, 60, "star"), secret(3380, 70, "egg"), secret(5450, 70, "apple")],
+      stash: stash(4400, 430, 8),
       checkpoints: [{ x: 1400 }, { x: 2840 }, { x: 4400 }],
       decor: { trees: 22, bushes: 26, clouds: 14, butterflies: 9 }
     },
@@ -93,6 +104,14 @@
       pads: [pad(960, 444), pad(2900, 444)],
       movers: [moverH(1900, 320, 140, 110, 0.95, 0.4), moverV(3120, 350, 130, 64, 1.0, 0.8)],
       baby: cage(2700),
+      coins: [
+        coin(420, 415), coin(620, 415), coin(945, 205),
+        coin(1560, 295), coin(2280, 290), coin(2620, 175),
+        coin(2900, 150), coin(3620, 220), coin(4380, 270),
+        coin(4640, 205)
+      ],
+      secrets: [secret(880, 65, "star"), secret(2560, 70, "egg"), secret(4640, 70, "star")],
+      stash: stash(2900, 430, 8),
       checkpoints: [{ x: 1180 }, { x: 2820 }, { x: 3960 }],
       decor: { trees: 14, bushes: 18, clouds: 10, butterflies: 6 }
     },
@@ -130,6 +149,14 @@
       pads: [pad(900, 444), pad(3580, 314)],
       movers: [moverH(1740, 320, 140, 130, 1.05, 0.2), moverV(4200, 360, 130, 76, 1.0, 1.2)],
       baby: cage(3000),
+      coins: [
+        coin(400, 415), coin(620, 280), coin(865, 200),
+        coin(1060, 175), coin(1480, 295), coin(2280, 290),
+        coin(2760, 290), coin(3260, 290), coin(3580, 175),
+        coin(4380, 220), coin(5120, 200)
+      ],
+      secrets: [secret(1060, 55, "star"), secret(2480, 70, "egg"), secret(5120, 70, "apple")],
+      stash: stash(2980, 430, 8),
       checkpoints: [{ x: 1000 }, { x: 2980 }, { x: 4400 }],
       decor: { trees: 16, bushes: 20, clouds: 12, butterflies: 7 }
     }

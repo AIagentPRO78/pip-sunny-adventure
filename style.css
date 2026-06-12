@@ -536,3 +536,58 @@ body.is-touch .touch-only { display: flex; }
   .toggle-pill, .toggle-knob, .swatch { transition: none; }
   .fade { transition: opacity 0.08s linear; }
 }
+
+/* ---------- v4: coin HUD ---------- */
+.ico.coin { background: radial-gradient(circle at 35% 30%, #ffe27a, #f4b400); border-radius: 50%; }
+
+/* ---------- v4: colorblind-safe (Okabe-Ito) + letter differentiators ---------- */
+body.colorblind { --apple: #d55e00; --egg: #f0e442; --star: #0072b2; }
+body.colorblind .ico { position: relative; }
+body.colorblind .ico::after {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 900; color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55); line-height: 1;
+}
+body.colorblind .ico.apple::after { content: "A"; }
+body.colorblind .ico.egg::after { content: "E"; color: #6a5a00; text-shadow: none; }
+body.colorblind .ico.star::after { content: "S"; }
+
+/* ---------- v4: picture mode (hide prose for pre-readers, keep icons) ---------- */
+body.icon-only .sub,
+body.icon-only .legend,
+body.icon-only .node-name,
+body.icon-only .closet-title { display: none; }
+
+/* ---------- v4: learning-mode selector ---------- */
+.select-row { cursor: pointer; }
+.select-value {
+  font-weight: 900; font-size: clamp(15px, 3.6vw, 18px); color: var(--btn-dark);
+  background: #fff3d4; border-radius: 999px; padding: 4px 14px; min-width: 64px; text-align: center;
+}
+
+/* ---------- v4: found tracker ---------- */
+.found-line { margin: -10px 0 16px; font-size: clamp(14px, 3.4vw, 18px); font-weight: 800; color: #6a627d; }
+.node-found {
+  display: inline-block; margin-top: 2px; font-size: clamp(11px, 2.8vw, 14px); font-weight: 800;
+  color: #fff; background: #6fcf57; border-radius: 999px; padding: 1px 8px;
+}
+
+/* ---------- v4: map nav + badges/album grids ---------- */
+.map-nav { display: flex; gap: 10px; justify-content: center; margin: 4px 0 10px; }
+.grid-card { width: min(94vw, 540px); }
+.badge-grid, .album-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 12px; margin: 18px 0 22px; max-height: 56vh; overflow-y: auto;
+}
+.badge-cell, .album-cell { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; }
+.badge-cell canvas, .album-cell canvas { width: 78px; height: 78px; }
+.badge-cell .badge-name, .album-cell .label { font-size: 12px; font-weight: 800; color: #6a627d; line-height: 1.1; }
+.badge-cell.is-locked .badge-name, .album-cell.locked .label { opacity: 0.55; }
+.album-count { color: #6a627d; font-weight: 700; margin-top: -6px; }
+
+/* ---------- v4: seasonal map accents ---------- */
+#levelSelect.season-spring { --season-accent: #ffb7d5; }
+#levelSelect.season-summer { --season-accent: #ffd24a; }
+#levelSelect.season-autumn { --season-accent: #ff9d52; }
+#levelSelect.season-winter { --season-accent: #9fd4ff; }
+#levelSelect.season-holiday { --season-accent: #ff6b6b; }
+#levelSelect[class*="season-"] .map-card { box-shadow: 0 14px 0 rgba(43, 36, 64, 0.12), 0 0 0 5px var(--season-accent, #fff); }
